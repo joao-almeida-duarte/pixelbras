@@ -35,8 +35,9 @@
 
     <!-- Ferramentas de Desenho e Seleção -->
     <div class="flex items-center gap-1.5 shrink-0">
-      <button id="tool-brush" class="tool-btn active flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Pincel (B)">
+      <button id="tool-brush" class="tool-btn active flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Pincel (Clique novamente para tamanho e formato)">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>
+        <span id="brushBadge" class="text-[10px] font-mono opacity-80">1px</span>
       </button>
 
       <button id="tool-bucket" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Balde (G)">
@@ -71,9 +72,11 @@
     <div class="w-px h-6 bg-zinc-700 mx-0.5 shrink-0"></div>
     <!-- Controle de Pincel, Camadas, Arquivo e Fundo -->
     <div class="flex items-center gap-1.5 shrink-0 pr-2">
-      <button id="btnBrushSize" class="px-2 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-mono font-bold text-emerald-400 active:scale-95" title="Tamanho do Pincel">1px</button>
       <button id="btnToggleLayers" class="px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-purple-400 active:scale-95" title="Camadas">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+      </button>
+      <button id="btnToggleAnim" class="px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-orange-400 active:scale-95" title="Animação / Quadros">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3V9z"/></svg>
       </button>
       <button id="btnBgConfig" class="px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-pink-400 active:scale-95" title="Imagem de Fundo da Tela">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 16l5-5 4 4 5-5 4 4"/></svg>
@@ -140,6 +143,38 @@
     </div>
   </div>
 
+  <!-- PAINEL DE ANIMAÇÃO (TIMELINE, ONION SKIN, FPS E EXPORTAÇÃO GIF/WEBP ANIMADOS) -->
+  <section id="animPanel" class="hidden w-full bg-zinc-900/95 border-t border-zinc-800 px-2.5 py-2 flex flex-col gap-2 shrink-0 z-20">
+    <div class="flex flex-wrap items-center justify-between gap-1.5 text-xs">
+      <div class="flex items-center gap-1">
+        <button id="btnPlayAnim" class="px-2.5 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-zinc-950 font-bold flex items-center gap-1 active:scale-95" title="Reproduzir / Pausar">
+          <span id="playIcon">▶ Play</span>
+        </button>
+        <button id="btnAddFrame" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 font-semibold active:scale-95" title="Novo Quadro Vazio">+ Quadro</button>
+        <button id="btnDupFrame" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 font-semibold active:scale-95" title="Duplicar Quadro Atual">Duplicar</button>
+        <button id="btnDelFrame" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-red-400 font-semibold active:scale-95" title="Excluir Quadro">Excluir</button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btnOnionSkin" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 font-semibold active:scale-95" title="Ativar/Desativar Onion Skin">
+          🧅 Onion Skin
+        </button>
+        <label class="flex items-center gap-1 text-zinc-300 font-mono">
+          <span>FPS:</span>
+          <input type="number" id="fpsInput" value="8" min="1" max="30" class="w-12 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-1 text-center text-xs text-orange-400 font-bold">
+        </label>
+      </div>
+
+      <div class="flex items-center gap-1">
+        <button id="btnExportGif" class="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold active:scale-95" title="Exportar Animação GIF">GIF</button>
+        <button id="btnExportAnimWebp" class="px-2.5 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-zinc-950 font-bold active:scale-95" title="Exportar Animação WebP">WebP Anim</button>
+      </div>
+    </div>
+
+    <!-- Lista horizontal de miniaturas dos quadros -->
+    <div id="framesList" class="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar"></div>
+  </section>
+
   <!-- Barra Inferior -->
   <footer class="w-full bg-zinc-900 border-t border-zinc-800 px-2.5 py-1.5 flex items-center justify-between gap-1.5 shrink-0 z-20">
     <div class="flex items-center gap-1">
@@ -173,6 +208,55 @@
       </button>
     </div>
   </footer>
+
+  <!-- PAINEL DO PINCEL: SLIDER DE TAMANHO, FORMATOS E CRIADOR ARBITRÁRIO -->
+  <div id="brushPanel" class="hidden fixed top-14 left-2 right-2 sm:right-auto sm:w-80 bg-zinc-900/95 border border-zinc-700 rounded-2xl p-3.5 shadow-2xl z-40 flex flex-col gap-3 backdrop-blur-md">
+    <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+      <span class="text-xs font-bold text-emerald-400">Configurar Pincel</span>
+      <button id="closeBrushPanel" class="text-zinc-400 hover:text-white text-base leading-none px-1.5">&times;</button>
+    </div>
+
+    <!-- Slider de Tamanho -->
+    <div class="flex flex-col gap-1 text-xs">
+      <div class="flex justify-between">
+        <span class="text-zinc-400">Tamanho do Traço:</span>
+        <span id="brushSizeVal" class="font-mono font-bold text-emerald-400">1px</span>
+      </div>
+      <input type="range" id="brushSizeSlider" min="1" max="16" value="1" class="w-full accent-emerald-500 cursor-pointer">
+    </div>
+
+    <!-- Formatos Pré-definidos -->
+    <div class="flex flex-col gap-1.5 text-xs">
+      <span class="text-zinc-400">Formato do Pincel:</span>
+      <div id="brushShapesList" class="grid grid-cols-4 gap-1.5">
+        <button data-shape="square" class="shape-opt active py-1.5 px-2 rounded-lg bg-zinc-800 border border-emerald-500 text-emerald-400 font-semibold text-[11px]">Quadrado</button>
+        <button data-shape="circle" class="shape-opt py-1.5 px-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 font-semibold text-[11px]">Redondo</button>
+        <button data-shape="diamond" class="shape-opt py-1.5 px-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 font-semibold text-[11px]">Losango</button>
+        <button data-shape="cross" class="shape-opt py-1.5 px-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 font-semibold text-[11px]">Cruz</button>
+      </div>
+    </div>
+
+    <!-- Formatos Personalizados Salvos -->
+    <div id="customBrushesWrap" class="hidden flex-col gap-1.5 text-xs border-t border-zinc-800 pt-2">
+      <span class="text-zinc-400">Meus Formatos Salvos:</span>
+      <div id="customBrushesList" class="flex flex-wrap gap-1.5"></div>
+    </div>
+
+    <!-- Criador de Formato Arbitrário (Matriz 7x7) -->
+    <div class="flex flex-col gap-2 text-xs border-t border-zinc-800 pt-2">
+      <div class="flex items-center justify-between">
+        <span class="text-zinc-400 font-medium">Criar Formato Arbitrário (7×7):</span>
+        <button id="btnClearBrushGrid" class="text-[11px] text-zinc-400 hover:text-white underline">Limpar</button>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="customBrushGrid" class="grid grid-cols-7 gap-0.5 bg-zinc-950 p-1.5 rounded-lg border border-zinc-700 shrink-0"></div>
+        <div class="flex flex-col gap-1.5 flex-1">
+          <input type="text" id="customBrushName" placeholder="Nome (ex: Estrela)" maxlength="14" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-200">
+          <button id="btnSaveCustomBrush" class="w-full py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs active:scale-95">Salvar Formato</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL 1: RODA DE CORES HSV -->
   <div id="colorModal" class="hidden fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
@@ -286,11 +370,26 @@
   // --- ESTADO GLOBAL DO CANVAS (COM CAMADAS, PINCEL VARIÁVEL E ZOOM) ---
   let gridW = 32;
   let gridH = 32;
-  let layers = [{ id: 1, name: 'Camada 1', visible: true, data: new Uint8Array(gridW * gridH * 4) }];
+  let frames = [{
+    id: 1,
+    layers: [{ id: 1, name: 'Camada 1', visible: true, data: new Uint8Array(gridW * gridH * 4) }],
+    activeLayerIdx: 0
+  }];
+  let activeFrameIdx = 0;
+  let frameCounter = 1;
+  let onionSkin = false;
+  let isPlaying = false;
+  let playTimer = null;
+  let fps = 8;
+
+  let layers = frames[0].layers;
   let activeLayerIdx = 0;
   let layerCounter = 1;
-  let pixels = layers[0].data; // Aponta sempre para a camada ativa
+  let pixels = layers[0].data; // Aponta sempre para a camada ativa do quadro ativo
   let brushSize = 1;
+  let brushShape = 'square'; // 'square' | 'circle' | 'diamond' | 'cross' | 'custom'
+  let activeCustomMatrix = null; // Array 7x7 de 0/1
+  let savedCustomBrushes = JSON.parse(localStorage.getItem('pixelbras_custom_brushes') || '[]');
   let zoomLevel = 1;
   let panX = 0, panY = 0;
   let currentColor = [4, 211, 97, 255];
@@ -338,6 +437,9 @@
     precision mediump float;
     varying vec2 v_uv;
     uniform sampler2D u_tex;
+    uniform sampler2D u_prevTex;
+    uniform sampler2D u_nextTex;
+    uniform float u_onionSkin;
     uniform vec2 u_gridSize;
     uniform float u_showGrid;
     uniform vec4 u_selRect; // x, y, w, h (w < 0 se inativo)
@@ -349,9 +451,24 @@
       // Fundo xadrez (checkerboard) para indicar transparência real
       float checker = mod(cell.x + cell.y, 2.0);
       vec3 bg = mix(vec3(0.14, 0.14, 0.16), vec3(0.19, 0.19, 0.22), checker);
+      vec3 finalColor = bg;
+
+      // Onion Skin: quadro anterior (tingido de vermelho) e próximo (tingido de ciano)
+      if (u_onionSkin > 0.5) {
+        vec4 prevCol = texture2D(u_prevTex, v_uv);
+        vec4 nextCol = texture2D(u_nextTex, v_uv);
+        if (prevCol.a > 0.01) {
+          vec3 prevTint = mix(prevCol.rgb, vec3(1.0, 0.25, 0.25), 0.45);
+          finalColor = mix(finalColor, prevTint, prevCol.a * 0.35);
+        }
+        if (nextCol.a > 0.01) {
+          vec3 nextTint = mix(nextCol.rgb, vec3(0.2, 0.85, 1.0), 0.45);
+          finalColor = mix(finalColor, nextTint, nextCol.a * 0.30);
+        }
+      }
 
       vec4 texColor = texture2D(u_tex, v_uv);
-      vec3 finalColor = mix(bg, texColor.rgb, texColor.a);
+      finalColor = mix(finalColor, texColor.rgb, texColor.a);
 
       // Grade de pixels
       if (u_showGrid > 0.5) {
@@ -406,24 +523,52 @@
   const uGridSizeLoc = gl.getUniformLocation(prog, 'u_gridSize');
   const uShowGridLoc = gl.getUniformLocation(prog, 'u_showGrid');
   const uSelRectLoc = gl.getUniformLocation(prog, 'u_selRect');
+  const uOnionSkinLoc = gl.getUniformLocation(prog, 'u_onionSkin');
+  gl.uniform1i(gl.getUniformLocation(prog, 'u_tex'), 0);
+  gl.uniform1i(gl.getUniformLocation(prog, 'u_prevTex'), 1);
+  gl.uniform1i(gl.getUniformLocation(prog, 'u_nextTex'), 2);
 
-  const tex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  function createPixelTex(unit) {
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+  }
+  const tex = createPixelTex(0);
+  const prevTex = createPixelTex(1);
+  const nextTex = createPixelTex(2);
 
   // --- HISTÓRICO UNDO / REDO ILIMITADO (Salva dimensões + pixels) ---
   const undoStack = [];
   const redoStack = [];
 
-  function cloneLayers() {
-    return layers.map(l => ({ id: l.id, name: l.name, visible: l.visible, data: new Uint8Array(l.data) }));
+  function cloneLayers(srcLayers = layers) {
+    return srcLayers.map(l => ({ id: l.id, name: l.name, visible: l.visible, data: new Uint8Array(l.data) }));
+  }
+
+  function cloneFrames() {
+    frames[activeFrameIdx].layers = layers;
+    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
+    return frames.map(fr => ({
+      id: fr.id,
+      activeLayerIdx: fr.activeLayerIdx,
+      layers: cloneLayers(fr.layers)
+    }));
+  }
+
+  function syncActiveFrameRefs() {
+    activeFrameIdx = Math.max(0, Math.min(activeFrameIdx, frames.length - 1));
+    layers = frames[activeFrameIdx].layers;
+    activeLayerIdx = Math.min(frames[activeFrameIdx].activeLayerIdx, layers.length - 1);
+    pixels = layers[activeLayerIdx].data;
   }
 
   function saveState() {
-    undoStack.push({ w: gridW, h: gridH, activeIdx: activeLayerIdx, layers: cloneLayers() });
+    undoStack.push({ w: gridW, h: gridH, activeFrameIdx, frames: cloneFrames() });
     redoStack.length = 0;
     updateHistoryUI();
   }
@@ -431,23 +576,21 @@
   function undo() {
     if (undoStack.length === 0) return;
     commitSelection();
-    redoStack.push({ w: gridW, h: gridH, activeIdx: activeLayerIdx, layers: cloneLayers() });
+    redoStack.push({ w: gridW, h: gridH, activeFrameIdx, frames: cloneFrames() });
     const state = undoStack.pop();
-    gridW = state.w; gridH = state.h; layers = state.layers;
-    activeLayerIdx = Math.min(state.activeIdx, layers.length - 1);
-    pixels = layers[activeLayerIdx].data;
-    renderLayersUI(); fitCanvas(); render(); updateHistoryUI();
+    gridW = state.w; gridH = state.h; frames = state.frames; activeFrameIdx = state.activeFrameIdx;
+    syncActiveFrameRefs();
+    renderLayersUI(); renderFramesUI(); fitCanvas(); render(); updateHistoryUI();
   }
 
   function redo() {
     if (redoStack.length === 0) return;
     commitSelection();
-    undoStack.push({ w: gridW, h: gridH, activeIdx: activeLayerIdx, layers: cloneLayers() });
+    undoStack.push({ w: gridW, h: gridH, activeFrameIdx, frames: cloneFrames() });
     const state = redoStack.pop();
-    gridW = state.w; gridH = state.h; layers = state.layers;
-    activeLayerIdx = Math.min(state.activeIdx, layers.length - 1);
-    pixels = layers[activeLayerIdx].data;
-    renderLayersUI(); fitCanvas(); render(); updateHistoryUI();
+    gridW = state.w; gridH = state.h; frames = state.frames; activeFrameIdx = state.activeFrameIdx;
+    syncActiveFrameRefs();
+    renderLayersUI(); renderFramesUI(); fitCanvas(); render(); updateHistoryUI();
   }
 
   function updateHistoryUI() {
@@ -482,11 +625,17 @@
     render();
   }
 
-  function getCompositeBuffer(overrideActiveBuf = null) {
+  function getCompositeBuffer(overrideActiveBuf = null, frameIdx = activeFrameIdx) {
+    const targetFrame = frames[frameIdx];
+    const targetLayers = targetFrame ? targetFrame.layers : layers;
+    const targetActiveLayer = targetFrame ? targetFrame.activeLayerIdx : activeLayerIdx;
     const comp = new Uint8Array(gridW * gridH * 4);
-    for (let i = 0; i < layers.length; i++) {
-      if (!layers[i].visible) continue;
-      const src = (i === activeLayerIdx && overrideActiveBuf) ? overrideActiveBuf : layers[i].data;
+
+    for (let i = 0; i < targetLayers.length; i++) {
+      if (!targetLayers[i].visible) continue;
+      const src = (frameIdx === activeFrameIdx && i === targetActiveLayer && overrideActiveBuf)
+        ? overrideActiveBuf
+        : targetLayers[i].data;
       for (let p = 0; p < comp.length; p += 4) {
         const a = src[p + 3] / 255;
         if (a > 0) {
@@ -498,7 +647,7 @@
         }
       }
     }
-    if (selection) {
+    if (frameIdx === activeFrameIdx && selection) {
       for (let sy = 0; sy < selection.h; sy++) {
         for (let sx = 0; sx < selection.w; sx++) {
           const sIdx = (sy * selection.w + sx) * 4;
@@ -517,6 +666,8 @@
     const bufToDraw = customBuf || getCompositeBuffer();
     gl.uniform2f(uGridSizeLoc, gridW, gridH);
     gl.uniform1f(uShowGridLoc, showGrid ? 1.0 : 0.0);
+    const showOnion = (onionSkin && !isPlaying && frames.length > 1) ? 1.0 : 0.0;
+    gl.uniform1f(uOnionSkinLoc, showOnion);
 
     if (tempSelRect) {
       gl.uniform4f(uSelRectLoc, tempSelRect.x, tempSelRect.y, tempSelRect.w, tempSelRect.h);
@@ -526,15 +677,79 @@
       gl.uniform4f(uSelRectLoc, 0, 0, -1, -1);
     }
 
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gridW, gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, bufToDraw);
+
+    if (showOnion > 0.5) {
+      const emptyBuf = new Uint8Array(gridW * gridH * 4);
+      const prevBuf = activeFrameIdx > 0 ? getCompositeBuffer(null, activeFrameIdx - 1) : emptyBuf;
+      const nextBuf = activeFrameIdx < frames.length - 1 ? getCompositeBuffer(null, activeFrameIdx + 1) : emptyBuf;
+
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, prevTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gridW, gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, prevBuf);
+
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, nextTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gridW, gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, nextBuf);
+    }
+
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    if (!isPlaying && typeof renderFramesUI === 'function') renderFramesUI();
   }
 
   // --- OPERAÇÕES DE PIXEL ---
   function setPixel(buf, w, h, x, y, rgba, size = 1) {
+    if (size <= 1 && (brushShape !== 'custom' || !activeCustomMatrix)) {
+      if (x < 0 || x >= w || y < 0 || y >= h) return;
+      const idx = (y * w + x) * 4;
+      buf[idx] = rgba[0]; buf[idx+1] = rgba[1]; buf[idx+2] = rgba[2]; buf[idx+3] = rgba[3];
+      return;
+    }
+
+    // Se for formato arbitrário salvo (matriz 7x7 escalada pelo brushSize)
+    if (brushShape === 'custom' && activeCustomMatrix && size > 1) {
+      const scale = Math.max(1, Math.round(size / 3));
+      const total = 7 * scale;
+      const offset = Math.floor(total / 2);
+      for (let gy = 0; gy < 7; gy++) {
+        for (let gx = 0; gx < 7; gx++) {
+          if (!activeCustomMatrix[gy * 7 + gx]) continue;
+          for (let sy = 0; sy < scale; sy++) {
+            for (let sx = 0; sx < scale; sx++) {
+              const px = x + (gx * scale + sx) - offset;
+              const py = y + (gy * scale + sy) - offset;
+              if (px < 0 || px >= w || py < 0 || py >= h) continue;
+              const idx = (py * w + px) * 4;
+              buf[idx] = rgba[0]; buf[idx+1] = rgba[1]; buf[idx+2] = rgba[2]; buf[idx+3] = rgba[3];
+            }
+          }
+        }
+      }
+      return;
+    }
+
     const offset = Math.floor(size / 2);
+    const center = (size - 1) / 2;
+    const radius = size / 2;
+
     for (let dy = 0; dy < size; dy++) {
       for (let dx = 0; dx < size; dx++) {
+        const rx = dx - center;
+        const ry = dy - center;
+        let inside = true;
+
+        if (brushShape === 'circle') {
+          inside = (rx * rx + ry * ry) <= (radius * radius);
+        } else if (brushShape === 'diamond') {
+          inside = (Math.abs(rx) + Math.abs(ry)) <= radius;
+        } else if (brushShape === 'cross') {
+          const arm = Math.max(0.6, size * 0.22);
+          inside = (Math.abs(rx) <= arm || Math.abs(ry) <= arm);
+        }
+
+        if (!inside) continue;
         const px = x + dx - offset;
         const py = y + dy - offset;
         if (px < 0 || px >= w || py < 0 || py >= h) continue;
@@ -605,7 +820,15 @@
     currentTool = name;
     tools.forEach(t => document.getElementById(`tool-${t}`).classList.toggle('active', t === name));
   }
-  tools.forEach(t => document.getElementById(`tool-${t}`).addEventListener('click', () => selectTool(t)));
+  const brushPanel = document.getElementById('brushPanel');
+  tools.forEach(t => document.getElementById(`tool-${t}`).addEventListener('click', () => {
+    if (t === 'brush' && currentTool === 'brush') {
+      brushPanel.classList.toggle('hidden');
+      return;
+    }
+    if (t !== 'brush') brushPanel.classList.add('hidden');
+    selectTool(t);
+  }));
 
   let isDrawing = false, startX = 0, startY = 0, lastX = 0, lastY = 0, snapshot = null;
 
@@ -1175,12 +1398,16 @@
     }
 
     gridW = newW; gridH = newH;
-    layers[activeLayerIdx].data = newBuf;
-    // Ajusta demais camadas para o novo tamanho
-    layers.forEach((l, idx) => {
-      if (idx !== activeLayerIdx) l.data = new Uint8Array(newW * newH * 4);
+    frames.forEach((fr, fIdx) => {
+      fr.layers.forEach((l, lIdx) => {
+        if (fIdx === activeFrameIdx && lIdx === activeLayerIdx) {
+          l.data = newBuf;
+        } else {
+          l.data = new Uint8Array(newW * newH * 4);
+        }
+      });
     });
-    pixels = newBuf; renderLayersUI();
+    pixels = newBuf; renderLayersUI(); renderFramesUI();
     fitCanvas();
     render();
     updateStatus(0, 0);
@@ -1219,12 +1446,110 @@
     }
   });
 
-  // --- TAMANHO DO PINCEL (1px -> 2px -> 3px -> 4px -> 6px) ---
-  const brushSizes = [1, 2, 3, 4, 6];
-  document.getElementById('btnBrushSize').addEventListener('click', e => {
-    const nextIdx = (brushSizes.indexOf(brushSize) + 1) % brushSizes.length;
-    brushSize = brushSizes[nextIdx];
-    e.currentTarget.textContent = `${brushSize}px`;
+  // --- PAINEL DO PINCEL: SLIDER, FORMATOS E CRIADOR ARBITRÁRIO 7x7 ---
+  const brushSizeSlider = document.getElementById('brushSizeSlider');
+  const brushSizeVal = document.getElementById('brushSizeVal');
+  const brushBadge = document.getElementById('brushBadge');
+
+  function updateBrushSize(val) {
+    brushSize = parseInt(val, 10) || 1;
+    brushSizeSlider.value = brushSize;
+    brushSizeVal.textContent = `${brushSize}px`;
+    brushBadge.textContent = `${brushSize}px`;
+  }
+
+  brushSizeSlider.addEventListener('input', e => updateBrushSize(e.target.value));
+  document.getElementById('closeBrushPanel').addEventListener('click', () => brushPanel.classList.add('hidden'));
+
+  function updateShapeButtonsUI() {
+    document.querySelectorAll('.shape-opt').forEach(btn => {
+      const active = (brushShape === btn.dataset.shape);
+      btn.classList.toggle('border-emerald-500', active);
+      btn.classList.toggle('text-emerald-400', active);
+      btn.classList.toggle('border-zinc-700', !active);
+      btn.classList.toggle('text-zinc-300', !active);
+    });
+    renderSavedBrushesUI();
+  }
+
+  document.querySelectorAll('.shape-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      brushShape = btn.dataset.shape;
+      activeCustomMatrix = null;
+      if (brushShape !== 'square' && brushSize < 3) updateBrushSize(3);
+      updateShapeButtonsUI();
+    });
+  });
+
+  // Grade interativa 7x7 para criar formato arbitrário
+  const customBrushGrid = document.getElementById('customBrushGrid');
+  let draftMatrix = new Array(49).fill(0);
+  draftMatrix[24] = 1; // Centro marcado inicialmente
+
+  function renderDraftGrid() {
+    customBrushGrid.innerHTML = '';
+    for (let i = 0; i < 49; i++) {
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = `w-4 h-4 rounded-[2px] transition ${draftMatrix[i] ? 'bg-emerald-400' : 'bg-zinc-800 hover:bg-zinc-700'}`;
+      cell.addEventListener('click', () => {
+        draftMatrix[i] = draftMatrix[i] ? 0 : 1;
+        renderDraftGrid();
+      });
+      customBrushGrid.appendChild(cell);
+    }
+  }
+  renderDraftGrid();
+
+  document.getElementById('btnClearBrushGrid').addEventListener('click', () => {
+    draftMatrix.fill(0);
+    renderDraftGrid();
+  });
+
+  function renderSavedBrushesUI() {
+    const wrap = document.getElementById('customBrushesWrap');
+    const list = document.getElementById('customBrushesList');
+    wrap.classList.toggle('hidden', savedCustomBrushes.length === 0);
+    wrap.classList.toggle('flex', savedCustomBrushes.length > 0);
+    list.innerHTML = '';
+
+    savedCustomBrushes.forEach((b, idx) => {
+      const isSelected = (brushShape === 'custom' && activeCustomMatrix === b.matrix);
+      const item = document.createElement('div');
+      item.className = `flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold cursor-pointer ${isSelected ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300' : 'bg-zinc-800 border-zinc-700 text-zinc-300'}`;
+      item.innerHTML = `<span>${b.name}</span><button type="button" class="text-red-400 hover:text-red-300 ml-1 font-bold" title="Remover">&times;</button>`;
+
+      item.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') {
+          savedCustomBrushes.splice(idx, 1);
+          localStorage.setItem('pixelbras_custom_brushes', JSON.stringify(savedCustomBrushes));
+          if (isSelected) { brushShape = 'square'; activeCustomMatrix = null; }
+          updateShapeButtonsUI();
+          return;
+        }
+        brushShape = 'custom';
+        activeCustomMatrix = b.matrix;
+        if (brushSize < 3) updateBrushSize(3);
+        updateShapeButtonsUI();
+      });
+      list.appendChild(item);
+    });
+  }
+  renderSavedBrushesUI();
+
+  document.getElementById('btnSaveCustomBrush').addEventListener('click', () => {
+    if (!draftMatrix.some(v => v === 1)) return alert('Marque pelo menos um pixel na grade 7x7.');
+    const nameInput = document.getElementById('customBrushName');
+    const name = nameInput.value.trim() || `Pincel #${savedCustomBrushes.length + 1}`;
+    const matrixCopy = [...draftMatrix];
+    savedCustomBrushes.push({ name, matrix: matrixCopy });
+    localStorage.setItem('pixelbras_custom_brushes', JSON.stringify(savedCustomBrushes));
+
+    brushShape = 'custom';
+    activeCustomMatrix = matrixCopy;
+    if (brushSize < 3) updateBrushSize(3);
+    nameInput.value = '';
+    updateShapeButtonsUI();
   });
 
   // --- GERENCIADOR DE CAMADAS ---
@@ -1388,7 +1713,395 @@
     }
   });
 
+  // --- GERENCIADOR DE ANIMAÇÃO, ONION SKIN, QUADROS E EXPORTAÇÃO GIF/WEBP ---
+  const animPanel = document.getElementById('animPanel');
+  const framesList = document.getElementById('framesList');
+
+  function stopPlayback() {
+    if (!isPlaying) return;
+    isPlaying = false;
+    clearInterval(playTimer);
+    playTimer = null;
+    document.getElementById('playIcon').textContent = '▶ Play';
+    render();
+  }
+
+  function renderFramesUI() {
+    if (!framesList) return;
+    framesList.innerHTML = '';
+    frames.forEach((fr, idx) => {
+      const isSelected = idx === activeFrameIdx;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `relative flex flex-col items-center p-1 rounded-lg border shrink-0 transition ${isSelected ? 'border-orange-500 bg-orange-950/40' : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'}`;
+
+      const thumb = document.createElement('canvas');
+      thumb.width = gridW;
+      thumb.height = gridH;
+      thumb.className = 'w-11 h-11 rounded bg-zinc-950 border border-zinc-800';
+      const tCtx = thumb.getContext('2d');
+      const comp = getCompositeBuffer(null, idx);
+      tCtx.putImageData(new ImageData(new Uint8ClampedArray(comp), gridW, gridH), 0, 0);
+
+      const badge = document.createElement('span');
+      badge.className = `text-[10px] font-mono mt-0.5 ${isSelected ? 'text-orange-400 font-bold' : 'text-zinc-400'}`;
+      badge.textContent = `#${idx + 1}`;
+
+      card.appendChild(thumb);
+      card.appendChild(badge);
+      card.addEventListener('click', () => {
+        stopPlayback();
+        commitSelection();
+        frames[activeFrameIdx].layers = layers;
+        frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
+        activeFrameIdx = idx;
+        syncActiveFrameRefs();
+        renderLayersUI();
+        render();
+      });
+      framesList.appendChild(card);
+    });
+  }
+
+  document.getElementById('btnToggleAnim').addEventListener('click', () => {
+    animPanel.classList.toggle('hidden');
+    renderFramesUI();
+    fitCanvas();
+  });
+
+  document.getElementById('btnAddFrame').addEventListener('click', () => {
+    stopPlayback();
+    commitSelection();
+    saveState();
+    frames[activeFrameIdx].layers = layers;
+    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
+    frameCounter++;
+    const newFrame = {
+      id: frameCounter,
+      activeLayerIdx: 0,
+      layers: [{ id: 1, name: 'Camada 1', visible: true, data: new Uint8Array(gridW * gridH * 4) }]
+    };
+    frames.splice(activeFrameIdx + 1, 0, newFrame);
+    activeFrameIdx++;
+    syncActiveFrameRefs();
+    renderLayersUI();
+    render();
+  });
+
+  document.getElementById('btnDupFrame').addEventListener('click', () => {
+    stopPlayback();
+    commitSelection();
+    saveState();
+    frames[activeFrameIdx].layers = layers;
+    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
+    frameCounter++;
+    const dupFrame = {
+      id: frameCounter,
+      activeLayerIdx: activeLayerIdx,
+      layers: cloneLayers(layers)
+    };
+    frames.splice(activeFrameIdx + 1, 0, dupFrame);
+    activeFrameIdx++;
+    syncActiveFrameRefs();
+    renderLayersUI();
+    render();
+  });
+
+  document.getElementById('btnDelFrame').addEventListener('click', () => {
+    if (frames.length <= 1) return alert('A animação precisa ter pelo menos 1 quadro.');
+    stopPlayback();
+    commitSelection();
+    saveState();
+    frames.splice(activeFrameIdx, 1);
+    activeFrameIdx = Math.max(0, activeFrameIdx - 1);
+    syncActiveFrameRefs();
+    renderLayersUI();
+    render();
+  });
+
+  document.getElementById('btnOnionSkin').addEventListener('click', e => {
+    onionSkin = !onionSkin;
+    e.currentTarget.classList.toggle('border-orange-500', onionSkin);
+    e.currentTarget.classList.toggle('text-orange-400', onionSkin);
+    render();
+  });
+
+  document.getElementById('fpsInput').addEventListener('change', e => {
+    fps = Math.max(1, Math.min(30, parseInt(e.target.value, 10) || 8));
+    e.target.value = fps;
+    if (isPlaying) {
+      stopPlayback();
+      document.getElementById('btnPlayAnim').click();
+    }
+  });
+
+  document.getElementById('btnPlayAnim').addEventListener('click', () => {
+    if (isPlaying) {
+      stopPlayback();
+      return;
+    }
+    if (frames.length <= 1) return;
+    commitSelection();
+    frames[activeFrameIdx].layers = layers;
+    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
+    isPlaying = true;
+    document.getElementById('playIcon').textContent = '⏸ Pause';
+    playTimer = setInterval(() => {
+      activeFrameIdx = (activeFrameIdx + 1) % frames.length;
+      syncActiveFrameRefs();
+      render();
+    }, Math.round(1000 / fps));
+  });
+
+  // --- CODIFICADOR GIF ANIMADO NATIVO (LZW + TRANSPARÊNCIA + LOOP INFINITO) ---
+  function encodeAnimatedGIF(w, h, rgbaFrames, fpsVal) {
+    const out = [];
+    const writeBytes = arr => { for (let i = 0; i < arr.length; i++) out.push(arr[i]); };
+    const writeStr = s => { for (let i = 0; i < s.length; i++) out.push(s.charCodeAt(i)); };
+    const writeU16 = v => { out.push(v & 0xff, (v >> 8) & 0xff); };
+
+    // Paleta global de 256 cores (índice 255 reservado para transparência)
+    const palette = new Uint8Array(256 * 3);
+    const colorMap = new Map();
+    let palCount = 0;
+
+    for (const buf of rgbaFrames) {
+      for (let i = 0; i < buf.length; i += 4) {
+        if (buf[i + 3] < 128) continue;
+        // Quantiza levemente para caber em 255 cores caso haja muitas
+        const key = ((buf[i] >> 1) << 14) | ((buf[i + 1] >> 1) << 7) | (buf[i + 2] >> 1);
+        if (!colorMap.has(key) && palCount < 255) {
+          colorMap.set(key, palCount);
+          palette[palCount * 3] = buf[i];
+          palette[palCount * 3 + 1] = buf[i + 1];
+          palette[palCount * 3 + 2] = buf[i + 2];
+          palCount++;
+        }
+      }
+    }
+
+    function nearestColorIdx(r, g, b) {
+      const key = ((r >> 1) << 14) | ((g >> 1) << 7) | (b >> 1);
+      if (colorMap.has(key)) return colorMap.get(key);
+      let best = 0, bestD = Infinity;
+      for (let i = 0; i < palCount; i++) {
+        const dr = r - palette[i * 3], dg = g - palette[i * 3 + 1], db = b - palette[i * 3 + 2];
+        const d = dr * dr + dg * dg + db * db;
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      return best;
+    }
+
+    // Header GIF89a + Logical Screen Descriptor
+    writeStr('GIF89a');
+    writeU16(w);
+    writeU16(h);
+    out.push(0xf7, 255, 0); // Global Color Table Flag (256 cores), bg index 255
+    writeBytes(palette);
+
+    // Application Extension NETSCAPE2.0 (Loop infinito)
+    out.push(0x21, 0xff, 0x0b);
+    writeStr('NETSCAPE2.0');
+    out.push(0x03, 0x01, 0x00, 0x00, 0x00);
+
+    const delayCs = Math.max(2, Math.round(100 / fpsVal));
+
+    // Compressor LZW por quadro
+    function lzwEncode(indices) {
+      const minCodeSize = 8;
+      const clearCode = 256;
+      const eoiCode = 257;
+      const lzwOut = [minCodeSize];
+      let subBlock = [];
+      let bitBuf = 0, bitCount = 0;
+
+      function emitCode(code, size) {
+        bitBuf |= (code << bitCount);
+        bitCount += size;
+        while (bitCount >= 8) {
+          subBlock.push(bitBuf & 0xff);
+          if (subBlock.length === 255) {
+            lzwOut.push(255, ...subBlock);
+            subBlock = [];
+          }
+          bitBuf >>= 8;
+          bitCount -= 8;
+        }
+      }
+
+      let codeSize = 9;
+      let nextCode = 258;
+      let dict = new Map();
+      emitCode(clearCode, codeSize);
+
+      let prefix = indices[0];
+      for (let i = 1; i < indices.length; i++) {
+        const k = indices[i];
+        const pair = (prefix << 8) | k;
+        if (dict.has(pair)) {
+          prefix = dict.get(pair);
+        } else {
+          emitCode(prefix, codeSize);
+          if (nextCode < 4096) {
+            dict.set(pair, nextCode++);
+            if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++;
+          } else {
+            emitCode(clearCode, codeSize);
+            dict.clear();
+            codeSize = 9;
+            nextCode = 258;
+          }
+          prefix = k;
+        }
+      }
+      emitCode(prefix, codeSize);
+      emitCode(eoiCode, codeSize);
+      if (bitCount > 0) subBlock.push(bitBuf & 0xff);
+      if (subBlock.length > 0) lzwOut.push(subBlock.length, ...subBlock);
+      lzwOut.push(0x00);
+      return lzwOut;
+    }
+
+    for (const buf of rgbaFrames) {
+      // Graphic Control Extension (Disposal 2 = limpa quadro para transparente + Transparent Color Index 255)
+      out.push(0x21, 0xf9, 0x04, 0x09);
+      writeU16(delayCs);
+      out.push(255, 0x00);
+
+      // Image Descriptor
+      out.push(0x2c);
+      writeU16(0); writeU16(0);
+      writeU16(w); writeU16(h);
+      out.push(0x00);
+
+      const indices = new Uint8Array(w * h);
+      for (let p = 0, idx = 0; p < buf.length; p += 4, idx++) {
+        indices[idx] = buf[p + 3] < 128 ? 255 : nearestColorIdx(buf[p], buf[p + 1], buf[p + 2]);
+      }
+      writeBytes(lzwEncode(indices));
+    }
+
+    out.push(0x3b); // Trailer
+    return new Blob([new Uint8Array(out)], { type: 'image/gif' });
+  }
+
+  // --- CODIFICADOR WEBP ANIMADO NATIVO (RIFF / VP8X / ANIM / ANMF) ---
+  async function encodeAnimatedWebP(w, h, rgbaFrames, fpsVal) {
+    const delayMs = Math.max(10, Math.round(1000 / fpsVal));
+    const framePayloads = [];
+
+    for (const buf of rgbaFrames) {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { alpha: true });
+      ctx.clearRect(0, 0, w, h);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          if (buf[i + 3] > 0) {
+            ctx.fillStyle = `rgba(${buf[i]},${buf[i+1]},${buf[i+2]},${buf[i+3]/255})`;
+            ctx.fillRect(x, y, 1, 1);
+          }
+        }
+      }
+      const blob = await new Promise(res => c.toBlob(res, 'image/webp', 1.0));
+      const ab = new Uint8Array(await blob.arrayBuffer());
+      // Extrai apenas os chunks VP8 / VP8L / ALPH internos do RIFF WebP estático
+      let pos = 12;
+      const chunks = [];
+      while (pos + 8 <= ab.length) {
+        const tag = String.fromCharCode(ab[pos], ab[pos+1], ab[pos+2], ab[pos+3]);
+        const len = ab[pos+4] | (ab[pos+5] << 8) | (ab[pos+6] << 16) | (ab[pos+7] << 24);
+        const paddedLen = len + (len & 1);
+        if (tag === 'VP8 ' || tag === 'VP8L' || tag === 'ALPH') {
+          chunks.push(ab.subarray(pos, pos + 8 + paddedLen));
+        }
+        pos += 8 + paddedLen;
+      }
+      const totalSub = chunks.reduce((s, ch) => s + ch.length, 0);
+      const merged = new Uint8Array(totalSub);
+      let off = 0;
+      for (const ch of chunks) { merged.set(ch, off); off += ch.length; }
+      framePayloads.push(merged);
+    }
+
+    function u32le(v) { return [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff]; }
+    function u24le(v) { return [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff]; }
+    function strBytes(s) { return [...s].map(c => c.charCodeAt(0)); }
+
+    // VP8X chunk (Flags: 0x12 = Animation [0x02] + Alpha [0x10])
+    const vp8x = new Uint8Array([
+      ...strBytes('VP8X'), ...u32le(10),
+      0x12, 0x00, 0x00, 0x00,
+      ...u24le(w - 1), ...u24le(h - 1)
+    ]);
+
+    // ANIM chunk (Fundo transparente 0x00000000 + Loop count 0 = infinito)
+    const anim = new Uint8Array([
+      ...strBytes('ANIM'), ...u32le(6),
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00
+    ]);
+
+    const anmfChunks = framePayloads.map(payload => {
+      const chunkLen = 16 + payload.length;
+      const header = new Uint8Array([
+        ...strBytes('ANMF'), ...u32le(chunkLen),
+        ...u24le(0), ...u24le(0), // X=0, Y=0
+        ...u24le(w - 1), ...u24le(h - 1),
+        ...u24le(delayMs),
+        0x03 // Blend=0 (replace), Dispose=1 (background/transparent)
+      ]);
+      const full = new Uint8Array(8 + chunkLen + (chunkLen & 1));
+      full.set(header, 0);
+      full.set(payload, 24);
+      return full;
+    });
+
+    const bodyLen = vp8x.length + anim.length + anmfChunks.reduce((s, c) => s + c.length, 0);
+    const riff = new Uint8Array(12 + bodyLen);
+    riff.set([...strBytes('RIFF'), ...u32le(4 + bodyLen), ...strBytes('WEBP')], 0);
+    let ptr = 12;
+    riff.set(vp8x, ptr); ptr += vp8x.length;
+    riff.set(anim, ptr); ptr += anim.length;
+    for (const c of anmfChunks) { riff.set(c, ptr); ptr += c.length; }
+
+    return new Blob([riff], { type: 'image/webp' });
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.download = filename;
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  document.getElementById('btnExportGif').addEventListener('click', () => {
+    stopPlayback();
+    commitSelection();
+    frames[activeFrameIdx].layers = layers;
+    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
+    const allComps = frames.map((_, idx) => getCompositeBuffer(null, idx));
+    const blob = encodeAnimatedGIF(gridW, gridH, allComps, fps);
+    downloadBlob(blob, `pixelbras-anim-${gridW}x${gridH}.gif`);
+  });
+
+  document.getElementById('btnExportAnimWebp').addEventListener('click', async () => {
+    stopPlayback();
+    commitSelection();
+    frames[activeFrameIdx].layers = layers;
+    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
+    const allComps = frames.map((_, idx) => getCompositeBuffer(null, idx));
+    const blob = await encodeAnimatedWebP(gridW, gridH, allComps, fps);
+    downloadBlob(blob, `pixelbras-anim-${gridW}x${gridH}.webp`);
+  });
+
   renderLayersUI();
+  renderFramesUI();
   fitCanvas();
   render();
 </script>
