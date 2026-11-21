@@ -3,134 +3,252 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>PixelBras - Editor WebGL</title>
+<title>PixelBras - Studio WebGL</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100dvh;
-    overflow: hidden;
-    overscroll-behavior: none;
-    touch-action: none;
-    background-color: #121214;
-    user-select: none;
-    -webkit-user-select: none;
+    margin: 0; padding: 0; width: 100%; height: 100dvh;
+    overflow: hidden; overscroll-behavior: none; touch-action: none;
+    background-color: #121214; user-select: none; -webkit-user-select: none;
   }
   canvas {
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-    touch-action: none;
+    image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none;
   }
   .tool-btn.active {
-    border-color: #04d361 !important;
-    color: #04d361 !important;
-    background-color: rgba(4, 211, 97, 0.15) !important;
+    border-color: #04d361 !important; color: #04d361 !important;
+    background-color: rgba(4, 211, 97, 0.16) !important;
   }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
 </head>
 <body class="flex flex-col justify-between text-zinc-200 font-sans">
 
-  <!-- Barra Superior: Marca, Cor e Ferramentas -->
-  <header class="w-full bg-zinc-900 border-b border-zinc-800 px-2 py-2 flex items-center justify-between gap-1 shrink-0 z-10">
-    <div class="flex items-center gap-1.5 pl-1">
-      <svg class="w-5 h-5 text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-      </svg>
-      <span class="font-bold text-sm tracking-tight hidden sm:inline">PixelBras</span>
+  <!-- Barra Superior -->
+  <header class="w-full bg-zinc-900 border-b border-zinc-800 px-2 py-1.5 flex items-center justify-between gap-1.5 shrink-0 z-20">
+    <!-- Botão Roda de Cores -->
+    <button id="btnColorWheel" class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 shrink-0 active:scale-95" title="Roda de Cores">
+      <span id="currentColorSwatch" class="w-5 h-5 rounded-full border border-white/40 shadow-inner" style="background-color: #04d361;"></span>
+      <svg class="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+    </button>
+
+    <!-- Ferramentas de Desenho e Seleção -->
+    <div class="flex items-center gap-1 overflow-x-auto no-scrollbar">
+      <button id="tool-brush" class="tool-btn active flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Pincel (B)">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>
+      </button>
+
+      <button id="tool-bucket" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Balde (G)">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>
+      </button>
+
+      <button id="tool-picker" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Conta-Gotas (I)">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>
+      </button>
+
+      <button id="tool-line" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Linha (L)">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="19" x2="19" y2="5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg>
+      </button>
+
+      <button id="tool-rect" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Retângulo (R)">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+      </button>
+
+      <button id="tool-select" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Seleção / Mover (M)">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"><rect x="3" y="3" width="18" height="18" rx="1"/></svg>
+      </button>
+
+      <button id="tool-eraser" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Borracha Transparente (E)">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+      </button>
     </div>
 
-    <div class="flex items-center gap-1 overflow-x-auto no-scrollbar">
-      <label class="relative w-9 h-9 rounded-lg overflow-hidden border-2 border-zinc-700 shrink-0 cursor-pointer" title="Cor">
-        <input type="color" id="colorPicker" value="#04d361" class="absolute -inset-2 w-14 h-14 cursor-pointer border-0 p-0">
-      </label>
-
-      <button id="tool-brush" class="tool-btn active flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Pincel (B)">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>
-        <span class="hidden md:inline">Pincel</span>
+    <!-- Botões de Arquivo e Redimensionamento -->
+    <div class="flex items-center gap-1 shrink-0">
+      <button id="btnOpenImport" class="px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-sky-400 active:scale-95" title="Importar Imagem">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
       </button>
-
-      <button id="tool-bucket" class="tool-btn flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Balde (G)">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>
-        <span class="hidden md:inline">Balde</span>
-      </button>
-
-      <button id="tool-picker" class="tool-btn flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Conta-Gotas (I)">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>
-        <span class="hidden md:inline">Gotas</span>
-      </button>
-
-      <button id="tool-line" class="tool-btn flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Linha (L)">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="19" x2="19" y2="5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg>
-        <span class="hidden md:inline">Linha</span>
-      </button>
-
-      <button id="tool-rect" class="tool-btn flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Retângulo (R)">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-        <span class="hidden md:inline">Retângulo</span>
-      </button>
-
-      <button id="tool-eraser" class="tool-btn flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Borracha (E)">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
-        <span class="hidden md:inline">Borracha</span>
+      <button id="btnOpenResize" class="px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-amber-400 active:scale-95" title="Tamanho / Amplificar / Simplificar">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
       </button>
     </div>
   </header>
 
-  <!-- Área Central: Canvas ajustado dinamicamente para ocupar o máximo da tela -->
+  <!-- Barra Contextual de Seleção (Aparece quando há área selecionada) -->
+  <div id="selectionBar" class="hidden w-full bg-emerald-950/90 border-b border-emerald-700/60 px-3 py-1.5 flex items-center justify-between text-xs z-10">
+    <span class="text-emerald-300 font-medium">Arraste para mover a seleção</span>
+    <div class="flex gap-1.5">
+      <button id="btnSelDelete" class="px-2 py-1 rounded bg-red-900/80 text-red-200 font-semibold">Apagar</button>
+      <button id="btnSelCommit" class="px-2 py-1 rounded bg-emerald-600 text-zinc-950 font-bold">Fixar</button>
+    </div>
+  </div>
+
+  <!-- Área Central WebGL -->
   <main id="workspace" class="flex-1 w-full flex items-center justify-center p-2 overflow-hidden relative">
     <canvas id="glcanvas" width="512" height="512" class="border-2 border-zinc-700 shadow-2xl rounded-sm cursor-crosshair"></canvas>
   </main>
 
-  <!-- Barra Inferior: Undo/Redo, Grade, Limpar e Exportar -->
-  <footer class="w-full bg-zinc-900 border-t border-zinc-800 px-3 py-2 flex items-center justify-between gap-2 shrink-0 z-10">
-    <div class="flex items-center gap-1.5">
-      <button id="btnUndo" disabled class="flex items-center gap-1 px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold disabled:opacity-35 active:scale-95 transition">
+  <!-- Barra Inferior -->
+  <footer class="w-full bg-zinc-900 border-t border-zinc-800 px-2.5 py-1.5 flex items-center justify-between gap-1.5 shrink-0 z-20">
+    <div class="flex items-center gap-1">
+      <button id="btnUndo" disabled class="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold disabled:opacity-35 active:scale-95">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
-        <span>Undo</span>
       </button>
-      <button id="btnRedo" disabled class="flex items-center gap-1 px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold disabled:opacity-35 active:scale-95 transition">
+      <button id="btnRedo" disabled class="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold disabled:opacity-35 active:scale-95">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
-        <span>Redo</span>
       </button>
     </div>
 
-    <div id="coords" class="text-xs font-mono text-zinc-400">0, 0</div>
+    <div id="statusText" class="text-[11px] font-mono text-zinc-400 truncate">32x32 | 0, 0</div>
 
-    <div class="flex items-center gap-1.5">
-      <button id="btnGrid" class="tool-btn active flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold active:scale-95 transition" title="Grade">
+    <div class="flex items-center gap-1">
+      <button id="btnGrid" class="tool-btn active px-2 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold active:scale-95" title="Grade">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
       </button>
-      <button id="btnClear" class="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-red-400 active:scale-95 transition" title="Limpar">
+      <button id="btnClear" class="px-2 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-red-400 active:scale-95" title="Limpar Tudo">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
       </button>
-      <button id="btnExport" class="flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-zinc-950 text-xs font-bold active:scale-95 transition" title="Salvar PNG">
+      <button id="btnExport" class="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold active:scale-95" title="Exportar PNG Transparente">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span>PNG</span>
       </button>
     </div>
   </footer>
 
+  <!-- MODAL 1: RODA DE CORES HSV -->
+  <div id="colorModal" class="hidden fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl p-4 w-full max-w-xs flex flex-col items-center gap-3 shadow-2xl">
+      <div class="w-full flex justify-between items-center">
+        <span class="font-bold text-sm">Roda de Cores</span>
+        <button id="closeColorModal" class="text-zinc-400 hover:text-white text-lg leading-none px-2">&times;</button>
+      </div>
+      <canvas id="wheelCanvas" width="220" height="220" class="rounded-full cursor-crosshair shadow-lg"></canvas>
+      <div class="w-full flex flex-col gap-1">
+        <div class="flex justify-between text-xs text-zinc-400">
+          <span>Brilho / Luminosidade</span>
+          <span id="valLabel">100%</span>
+        </div>
+        <input type="range" id="valSlider" min="0" max="100" value="100" class="w-full accent-emerald-500">
+      </div>
+      <div class="w-full flex items-center justify-between gap-2 pt-1">
+        <div class="flex items-center gap-2">
+          <div id="wheelPreview" class="w-8 h-8 rounded-lg border border-zinc-600" style="background:#04d361;"></div>
+          <input type="text" id="hexInput" value="#04d361" maxlength="7" class="w-24 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs font-mono uppercase">
+        </div>
+        <button id="confirmColorBtn" class="px-4 py-2 rounded-lg bg-emerald-500 text-zinc-950 font-bold text-xs">Aplicar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: IMPORTAR IMAGEM -->
+  <div id="importModal" class="hidden fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl p-4 w-full max-w-sm flex flex-col gap-3 shadow-2xl">
+      <div class="flex justify-between items-center">
+        <span class="font-bold text-sm text-sky-400">Importar & Pixelizar Imagem</span>
+        <button id="closeImportModal" class="text-zinc-400 hover:text-white text-lg leading-none px-2">&times;</button>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" class="text-xs text-zinc-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-sky-400">
+      
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <label class="flex flex-col gap-1">
+          <span class="text-zinc-400">Largura (px):</span>
+          <input type="number" id="impW" value="32" min="4" max="256" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-zinc-400">Altura (px):</span>
+          <input type="number" id="impH" value="32" min="4" max="256" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
+        </label>
+      </div>
+
+      <label class="flex flex-col gap-1 text-xs">
+        <span class="text-zinc-400">Limite máximo de pixels (ex: 4096 = 64x64):</span>
+        <input type="number" id="impMaxPixels" value="4096" min="64" max="65536" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
+        <span id="impLimitHint" class="text-[11px] text-zinc-500">Se L × A ultrapassar o limite, será ajustado proporcionalmente.</span>
+      </label>
+
+      <label class="flex flex-col gap-1 text-xs">
+        <div class="flex justify-between">
+          <span class="text-zinc-400">Limite de Cores (Paleta):</span>
+          <span id="impColorsLabel" class="font-mono text-sky-400">16 cores</span>
+        </div>
+        <input type="range" id="impColors" min="2" max="64" value="16" class="w-full accent-sky-400">
+      </label>
+
+      <button id="confirmImportBtn" class="w-full py-2.5 rounded-lg bg-sky-500 text-zinc-950 font-bold text-xs mt-1">Importar para Tela</button>
+    </div>
+  </div>
+
+  <!-- MODAL 3: REDIMENSIONAR / AMPLIFICAR / SIMPLIFICAR -->
+  <div id="resizeModal" class="hidden fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl p-4 w-full max-w-sm flex flex-col gap-3 shadow-2xl">
+      <div class="flex justify-between items-center">
+        <span class="font-bold text-sm text-amber-400">Redimensionar & Processar Arte</span>
+        <button id="closeResizeModal" class="text-zinc-400 hover:text-white text-lg leading-none px-2">&times;</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <label class="flex flex-col gap-1">
+          <span class="text-zinc-400">Nova Largura:</span>
+          <input type="number" id="resW" value="64" min="4" max="256" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-zinc-400">Nova Altura:</span>
+          <input type="number" id="resH" value="64" min="4" max="256" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
+        </label>
+      </div>
+
+      <label class="flex flex-col gap-1 text-xs">
+        <span class="text-zinc-400">Modo de Transformação:</span>
+        <select id="resMode" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-2 text-zinc-200">
+          <option value="amplify">Amplificar (Pixel-art nítido / Nearest-Neighbor)</option>
+          <option value="simplify">Simplificar (Reduzir detalhes + quantizar paleta)</option>
+          <option value="smooth">Suavizar & Escalar (Bilinear + Limpeza de bordas)</option>
+        </select>
+      </label>
+
+      <label id="simplifyColorsWrap" class="hidden flex-col gap-1 text-xs">
+        <div class="flex justify-between">
+          <span class="text-zinc-400">Simplificar paleta para:</span>
+          <span id="resColorsLabel" class="font-mono text-amber-400">8 cores</span>
+        </div>
+        <input type="range" id="resColors" min="2" max="32" value="8" class="w-full accent-amber-400">
+      </label>
+
+      <button id="confirmResizeBtn" class="w-full py-2.5 rounded-lg bg-amber-400 text-zinc-950 font-bold text-xs mt-1">Aplicar Transformação</button>
+    </div>
+  </div>
+
 <script>
-  const GRID = 32;
-  const BG_COLOR = [24, 24, 28, 255];
+  // --- ESTADO GLOBAL DO CANVAS ---
+  let gridW = 32;
+  let gridH = 32;
+  let pixels = new Uint8Array(gridW * gridH * 4); // RGBA com Alpha 0 = Transparente
+  let currentColor = [4, 211, 97, 255];
+  let currentTool = 'brush';
+  let showGrid = true;
+
   const canvas = document.getElementById('glcanvas');
   const workspace = document.getElementById('workspace');
-  const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
+  const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true, alpha: true });
 
-  // Ajusta o canvas para ocupar o maior quadrado possível na tela (Mobile e Desktop)
+  // Ajusta proporção na tela (Mobile & Desktop)
   function fitCanvas() {
     const rect = workspace.getBoundingClientRect();
-    const size = Math.floor(Math.min(rect.width - 12, rect.height - 12));
-    canvas.style.width = size + 'px';
-    canvas.style.height = size + 'px';
+    const availW = rect.width - 16;
+    const availH = rect.height - 16;
+    const ratio = gridW / gridH;
+    let drawW = availW;
+    let drawH = availW / ratio;
+    if (drawH > availH) {
+      drawH = availH;
+      drawW = availH * ratio;
+    }
+    canvas.style.width = Math.floor(drawW) + 'px';
+    canvas.style.height = Math.floor(drawH) + 'px';
   }
   window.addEventListener('resize', fitCanvas);
-  fitCanvas();
 
-  // Shaders WebGL
+  // --- SHADERS WEBGL (Com Fundo Xadrez de Transparência + Grade + Seleção) ---
   const vsSource = `
     attribute vec2 a_pos;
     varying vec2 v_uv;
@@ -145,17 +263,48 @@
     precision mediump float;
     varying vec2 v_uv;
     uniform sampler2D u_tex;
-    uniform float u_grid;
+    uniform vec2 u_gridSize;
     uniform float u_showGrid;
+    uniform vec4 u_selRect; // x, y, w, h (w < 0 se inativo)
+
     void main() {
-      vec4 color = texture2D(u_tex, v_uv);
+      vec2 pixelCoord = v_uv * u_gridSize;
+      vec2 cell = floor(pixelCoord);
+
+      // Fundo xadrez (checkerboard) para indicar transparência real
+      float checker = mod(cell.x + cell.y, 2.0);
+      vec3 bg = mix(vec3(0.14, 0.14, 0.16), vec3(0.19, 0.19, 0.22), checker);
+
+      vec4 texColor = texture2D(u_tex, v_uv);
+      vec3 finalColor = mix(bg, texColor.rgb, texColor.a);
+
+      // Grade de pixels
       if (u_showGrid > 0.5) {
-        vec2 gridPos = fract(v_uv * u_grid);
-        float line = step(0.95, gridPos.x) + step(0.95, gridPos.y);
-        gl_FragColor = mix(color, vec4(0.25, 0.25, 0.28, 1.0), min(line, 1.0) * 0.4);
-      } else {
-        gl_FragColor = color;
+        vec2 gridPos = fract(pixelCoord);
+        float line = step(0.94, gridPos.x) + step(0.94, gridPos.y);
+        finalColor = mix(finalColor, vec3(0.32, 0.32, 0.36), min(line, 1.0) * 0.45);
       }
+
+      // Contorno da Ferramenta de Seleção
+      if (u_selRect.z > 0.0 && u_selRect.w > 0.0) {
+        bool insideX = cell.x >= u_selRect.x && cell.x < (u_selRect.x + u_selRect.z);
+        bool insideY = cell.y >= u_selRect.y && cell.y < (u_selRect.y + u_selRect.w);
+        if (insideX && insideY) {
+          bool border = (cell.x == u_selRect.x || cell.x == u_selRect.x + u_selRect.z - 1.0 ||
+                         cell.y == u_selRect.y || cell.y == u_selRect.y + u_selRect.w - 1.0);
+          vec2 f = fract(pixelCoord);
+          bool edge = (cell.x == u_selRect.x && f.x < 0.2) ||
+                      (cell.x == u_selRect.x + u_selRect.z - 1.0 && f.x > 0.8) ||
+                      (cell.y == u_selRect.y && f.y < 0.2) ||
+                      (cell.y == u_selRect.y + u_selRect.w - 1.0 && f.y > 0.8);
+          if (border && edge) {
+            float dash = mod(floor(pixelCoord.x * 4.0) + floor(pixelCoord.y * 4.0), 2.0);
+            finalColor = mix(vec3(0.02, 0.83, 0.38), vec3(1.0), dash);
+          }
+        }
+      }
+
+      gl_FragColor = vec4(finalColor, 1.0);
     }
   `;
 
@@ -179,10 +328,9 @@
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-  const uGridLoc = gl.getUniformLocation(prog, 'u_grid');
+  const uGridSizeLoc = gl.getUniformLocation(prog, 'u_gridSize');
   const uShowGridLoc = gl.getUniformLocation(prog, 'u_showGrid');
-  gl.uniform1f(uGridLoc, GRID);
-  gl.uniform1f(uShowGridLoc, 1.0);
+  const uSelRectLoc = gl.getUniformLocation(prog, 'u_selRect');
 
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -191,29 +339,34 @@
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-  let pixels = new Uint8Array(GRID * GRID * 4);
-  let snapshot = null;
+  // --- HISTÓRICO UNDO / REDO ILIMITADO (Salva dimensões + pixels) ---
   const undoStack = [];
   const redoStack = [];
 
   function saveState() {
-    undoStack.push(new Uint8Array(pixels));
+    undoStack.push({ w: gridW, h: gridH, data: new Uint8Array(pixels) });
     redoStack.length = 0;
     updateHistoryUI();
   }
 
   function undo() {
     if (undoStack.length === 0) return;
-    redoStack.push(new Uint8Array(pixels));
-    pixels = undoStack.pop();
+    commitSelection();
+    redoStack.push({ w: gridW, h: gridH, data: new Uint8Array(pixels) });
+    const state = undoStack.pop();
+    gridW = state.w; gridH = state.h; pixels = state.data;
+    fitCanvas();
     render();
     updateHistoryUI();
   }
 
   function redo() {
     if (redoStack.length === 0) return;
-    undoStack.push(new Uint8Array(pixels));
-    pixels = redoStack.pop();
+    commitSelection();
+    undoStack.push({ w: gridW, h: gridH, data: new Uint8Array(pixels) });
+    const state = redoStack.pop();
+    gridW = state.w; gridH = state.h; pixels = state.data;
+    fitCanvas();
     render();
     updateHistoryUI();
   }
@@ -223,39 +376,75 @@
     document.getElementById('btnRedo').disabled = redoStack.length === 0;
   }
 
-  function render(buffer = pixels) {
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, GRID, GRID, 0, gl.RGBA, gl.UNSIGNED_BYTE, buffer);
+  // --- SISTEMA DE SELEÇÃO FLUTUANTE ---
+  let selection = null; // { x, y, w, h, data: Uint8Array }
+  let selDragging = false;
+  let selDragOffset = [0, 0];
+  let selCreating = false;
+
+  function updateSelectionBar() {
+    document.getElementById('selectionBar').classList.toggle('hidden', !selection);
+  }
+
+  function commitSelection() {
+    if (!selection) return;
+    for (let sy = 0; sy < selection.h; sy++) {
+      for (let sx = 0; sx < selection.w; sx++) {
+        const sIdx = (sy * selection.w + sx) * 4;
+        if (selection.data[sIdx + 3] > 0) {
+          setPixel(pixels, gridW, gridH, selection.x + sx, selection.y + sy, [
+            selection.data[sIdx], selection.data[sIdx+1], selection.data[sIdx+2], selection.data[sIdx+3]
+          ]);
+        }
+      }
+    }
+    selection = null;
+    updateSelectionBar();
+    render();
+  }
+
+  function getCompositeBuffer(base = pixels) {
+    if (!selection) return base;
+    const comp = new Uint8Array(base);
+    for (let sy = 0; sy < selection.h; sy++) {
+      for (let sx = 0; sx < selection.w; sx++) {
+        const sIdx = (sy * selection.w + sx) * 4;
+        if (selection.data[sIdx + 3] > 0) {
+          setPixel(comp, gridW, gridH, selection.x + sx, selection.y + sy, [
+            selection.data[sIdx], selection.data[sIdx+1], selection.data[sIdx+2], selection.data[sIdx+3]
+          ]);
+        }
+      }
+    }
+    return comp;
+  }
+
+  function render(customBuf = null, tempSelRect = null) {
+    const bufToDraw = customBuf || getCompositeBuffer();
+    gl.uniform2f(uGridSizeLoc, gridW, gridH);
+    gl.uniform1f(uShowGridLoc, showGrid ? 1.0 : 0.0);
+
+    if (tempSelRect) {
+      gl.uniform4f(uSelRectLoc, tempSelRect.x, tempSelRect.y, tempSelRect.w, tempSelRect.h);
+    } else if (selection) {
+      gl.uniform4f(uSelRectLoc, selection.x, selection.y, selection.w, selection.h);
+    } else {
+      gl.uniform4f(uSelRectLoc, 0, 0, -1, -1);
+    }
+
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gridW, gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, bufToDraw);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  let currentTool = 'brush';
-  let isDrawing = false;
-  let startX = 0, startY = 0;
-  let lastX = 0, lastY = 0;
-  let showGrid = true;
-  const colorPicker = document.getElementById('colorPicker');
-
-  function hexToRgba(hex) {
-    return [
-      parseInt(hex.slice(1, 3), 16),
-      parseInt(hex.slice(3, 5), 16),
-      parseInt(hex.slice(5, 7), 16),
-      255
-    ];
-  }
-
-  function rgbaToHex(r, g, b) {
-    return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
-  }
-
-  function setPixel(buf, x, y, rgba) {
-    if (x < 0 || x >= GRID || y < 0 || y >= GRID) return;
-    const idx = (y * GRID + x) * 4;
+  // --- OPERAÇÕES DE PIXEL ---
+  function setPixel(buf, w, h, x, y, rgba) {
+    if (x < 0 || x >= w || y < 0 || y >= h) return;
+    const idx = (y * w + x) * 4;
     buf[idx] = rgba[0]; buf[idx+1] = rgba[1]; buf[idx+2] = rgba[2]; buf[idx+3] = rgba[3];
   }
 
-  function getPixel(buf, x, y) {
-    const idx = (y * GRID + x) * 4;
+  function getPixel(buf, w, x, y) {
+    const idx = (y * w + x) * 4;
     return [buf[idx], buf[idx+1], buf[idx+2], buf[idx+3]];
   }
 
@@ -264,21 +453,18 @@
   }
 
   function floodFill(x, y, fillColor) {
-    const targetColor = getPixel(pixels, x, y);
+    const targetColor = getPixel(pixels, gridW, x, y);
     if (colorsMatch(targetColor, fillColor)) return false;
-
     const stack = [[x, y]];
-    const visited = new Uint8Array(GRID * GRID);
-
+    const visited = new Uint8Array(gridW * gridH);
     while (stack.length > 0) {
       const [cx, cy] = stack.pop();
-      if (cx < 0 || cx >= GRID || cy < 0 || cy >= GRID) continue;
-      const vIdx = cy * GRID + cx;
+      if (cx < 0 || cx >= gridW || cy < 0 || cy >= gridH) continue;
+      const vIdx = cy * gridW + cx;
       if (visited[vIdx]) continue;
       visited[vIdx] = 1;
-
-      if (colorsMatch(getPixel(pixels, cx, cy), targetColor)) {
-        setPixel(pixels, cx, cy, fillColor);
+      if (colorsMatch(getPixel(pixels, gridW, cx, cy), targetColor)) {
+        setPixel(pixels, gridW, gridH, cx, cy, fillColor);
         stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
       }
     }
@@ -290,7 +476,7 @@
     let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
     let err = dx + dy;
     while (true) {
-      setPixel(buf, x0, y0, color);
+      setPixel(buf, gridW, gridH, x0, y0, color);
       if (x0 === x1 && y0 === y1) break;
       let e2 = 2 * err;
       if (e2 >= dy) { err += dy; x0 += sx; }
@@ -302,43 +488,63 @@
     const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
     const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
     for (let x = minX; x <= maxX; x++) {
-      setPixel(buf, x, minY, color);
-      setPixel(buf, x, maxY, color);
+      setPixel(buf, gridW, gridH, x, minY, color);
+      setPixel(buf, gridW, gridH, x, maxY, color);
     }
     for (let y = minY; y <= maxY; y++) {
-      setPixel(buf, minX, y, color);
-      setPixel(buf, maxX, y, color);
+      setPixel(buf, gridW, gridH, minX, y, color);
+      setPixel(buf, gridW, gridH, maxX, y, color);
     }
   }
 
-  const tools = ['brush', 'bucket', 'picker', 'line', 'rect', 'eraser'];
+  // --- FERRAMENTAS & TOQUE / MOUSE ---
+  const tools = ['brush', 'bucket', 'picker', 'line', 'rect', 'select', 'eraser'];
   function selectTool(name) {
+    if (currentTool === 'select' && name !== 'select') commitSelection();
     currentTool = name;
-    tools.forEach(t => {
-      document.getElementById(`tool-${t}`).classList.toggle('active', t === name);
-    });
+    tools.forEach(t => document.getElementById(`tool-${t}`).classList.toggle('active', t === name));
   }
-  tools.forEach(t => {
-    document.getElementById(`tool-${t}`).addEventListener('click', () => selectTool(t));
-  });
+  tools.forEach(t => document.getElementById(`tool-${t}`).addEventListener('click', () => selectTool(t)));
 
-  // Extrai coordenadas tanto de Touch quanto de Mouse
-  function getCoordsFromClient(clientX, clientY) {
+  let isDrawing = false, startX = 0, startY = 0, lastX = 0, lastY = 0, snapshot = null;
+
+  function getCoords(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor(((clientX - rect.left) / rect.width) * GRID);
-    const y = Math.floor(((clientY - rect.top) / rect.height) * GRID);
-    return [Math.max(0, Math.min(GRID - 1, x)), Math.max(0, Math.min(GRID - 1, y))];
+    const x = Math.floor(((clientX - rect.left) / rect.width) * gridW);
+    const y = Math.floor(((clientY - rect.top) / rect.height) * gridH);
+    return [Math.max(0, Math.min(gridW - 1, x)), Math.max(0, Math.min(gridH - 1, y))];
+  }
+
+  function updateStatus(x, y) {
+    document.getElementById('statusText').textContent = `${gridW}x${gridH} | ${x}, ${y}`;
   }
 
   function handleStart(clientX, clientY) {
-    const [x, y] = getCoordsFromClient(clientX, clientY);
+    const [x, y] = getCoords(clientX, clientY);
     lastX = x; lastY = y;
-    document.getElementById('coords').textContent = `${x}, ${y}`;
-    const activeColor = currentTool === 'eraser' ? BG_COLOR : hexToRgba(colorPicker.value);
+    updateStatus(x, y);
+
+    if (currentTool === 'select') {
+      if (selection && x >= selection.x && x < selection.x + selection.w && y >= selection.y && y < selection.y + selection.h) {
+        selDragging = true;
+        selDragOffset = [x - selection.x, y - selection.y];
+        return;
+      }
+      commitSelection();
+      selCreating = true;
+      startX = x; startY = y;
+      render(null, { x, y, w: 1, h: 1 });
+      return;
+    }
+
+    const activeColor = currentTool === 'eraser' ? [0, 0, 0, 0] : currentColor;
 
     if (currentTool === 'picker') {
-      const picked = getPixel(pixels, x, y);
-      colorPicker.value = rgbaToHex(picked[0], picked[1], picked[2]);
+      const picked = getPixel(pixels, gridW, x, y);
+      if (picked[3] > 0) {
+        currentColor = [picked[0], picked[1], picked[2], 255];
+        syncColorUI();
+      }
       selectTool('brush');
       return;
     }
@@ -355,23 +561,35 @@
 
     saveState();
     isDrawing = true;
-    startX = x;
-    startY = y;
+    startX = x; startY = y;
     snapshot = new Uint8Array(pixels);
 
     if (currentTool === 'brush' || currentTool === 'eraser') {
-      setPixel(pixels, x, y, activeColor);
+      setPixel(pixels, gridW, gridH, x, y, activeColor);
       render();
     }
   }
 
   function handleMove(clientX, clientY) {
-    const [x, y] = getCoordsFromClient(clientX, clientY);
-    document.getElementById('coords').textContent = `${x}, ${y}`;
-    if (!isDrawing) return;
+    const [x, y] = getCoords(clientX, clientY);
+    updateStatus(x, y);
 
+    if (currentTool === 'select') {
+      if (selDragging && selection) {
+        selection.x = x - selDragOffset[0];
+        selection.y = y - selDragOffset[1];
+        render();
+      } else if (selCreating) {
+        const minX = Math.min(startX, x), minY = Math.min(startY, y);
+        const w = Math.abs(x - startX) + 1, h = Math.abs(y - startY) + 1;
+        render(null, { x: minX, y: minY, w, h });
+      }
+      return;
+    }
+
+    if (!isDrawing) return;
     lastX = x; lastY = y;
-    const activeColor = currentTool === 'eraser' ? BG_COLOR : hexToRgba(colorPicker.value);
+    const activeColor = currentTool === 'eraser' ? [0, 0, 0, 0] : currentColor;
 
     if (currentTool === 'brush' || currentTool === 'eraser') {
       drawLine(pixels, startX, startY, x, y, activeColor);
@@ -389,113 +607,385 @@
   }
 
   function handleEnd() {
-    if (!isDrawing) return;
-    const activeColor = hexToRgba(colorPicker.value);
+    if (currentTool === 'select') {
+      if (selDragging) {
+        selDragging = false;
+        return;
+      }
+      if (selCreating) {
+        selCreating = false;
+        const minX = Math.min(startX, lastX), minY = Math.min(startY, lastY);
+        const w = Math.abs(lastX - startX) + 1, h = Math.abs(lastY - startY) + 1;
+        saveState();
+        const selData = new Uint8Array(w * h * 4);
+        for (let sy = 0; sy < h; sy++) {
+          for (let sx = 0; sx < w; sx++) {
+            const p = getPixel(pixels, gridW, minX + sx, minY + sy);
+            const dIdx = (sy * w + sx) * 4;
+            selData[dIdx] = p[0]; selData[dIdx+1] = p[1]; selData[dIdx+2] = p[2]; selData[dIdx+3] = p[3];
+            setPixel(pixels, gridW, gridH, minX + sx, minY + sy, [0, 0, 0, 0]);
+          }
+        }
+        selection = { x: minX, y: minY, w, h, data: selData };
+        updateSelectionBar();
+        render();
+      }
+      return;
+    }
 
+    if (!isDrawing) return;
     if (currentTool === 'line') {
-      drawLine(pixels, startX, startY, lastX, lastY, activeColor);
+      drawLine(pixels, startX, startY, lastX, lastY, currentColor);
       render();
     } else if (currentTool === 'rect') {
-      drawRect(pixels, startX, startY, lastX, lastY, activeColor);
+      drawRect(pixels, startX, startY, lastX, lastY, currentColor);
       render();
     }
     isDrawing = false;
     snapshot = null;
   }
 
-  // Eventos Touch Nativos (Mobile/Tablet)
-  canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    if (e.touches.length > 0) {
-      handleStart(e.touches[0].clientX, e.touches[0].clientY);
+  // Listeners Touch + Mouse
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); if (e.touches[0]) handleStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); if (e.touches[0]) { lastX = getCoords(e.touches[0].clientX, e.touches[0].clientY)[0]; lastY = getCoords(e.touches[0].clientX, e.touches[0].clientY)[1]; handleMove(e.touches[0].clientX, e.touches[0].clientY); } }, { passive: false });
+  canvas.addEventListener('touchend', e => { e.preventDefault(); handleEnd(); }, { passive: false });
+  canvas.addEventListener('touchcancel', e => { e.preventDefault(); handleEnd(); }, { passive: false });
+
+  canvas.addEventListener('mousedown', e => { if (e.button === 0) handleStart(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', e => { if (isDrawing || selDragging || selCreating || e.target === canvas) handleMove(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', handleEnd);
+
+  // Botões Seleção
+  document.getElementById('btnSelCommit').addEventListener('click', commitSelection);
+  document.getElementById('btnSelDelete').addEventListener('click', () => {
+    selection = null;
+    updateSelectionBar();
+    render();
+  });
+
+  // --- EXPORTAÇÃO PNG COM FUNDO 100% TRANSPARENTE ---
+  document.getElementById('btnExport').addEventListener('click', () => {
+    commitSelection();
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = gridW;
+    offCanvas.height = gridH;
+    const ctx = offCanvas.getContext('2d');
+    const imgData = new ImageData(new Uint8ClampedArray(pixels), gridW, gridH);
+    ctx.putImageData(imgData, 0, 0);
+
+    const a = document.createElement('a');
+    a.download = `pixelbras-${gridW}x${gridH}.png`;
+    a.href = offCanvas.toDataURL('image/png');
+    a.click();
+  });
+
+  // --- RODA DE CORES HSV INTERATIVA ---
+  const colorModal = document.getElementById('colorModal');
+  const wheelCanvas = document.getElementById('wheelCanvas');
+  const wheelCtx = wheelCanvas.getContext('2d');
+  const valSlider = document.getElementById('valSlider');
+  const hexInput = document.getElementById('hexInput');
+  let wheelH = 147, wheelS = 0.98, wheelV = 0.83;
+
+  function hsvToRgb(h, s, v) {
+    let f = (n, k = (n + h / 60) % 6) => v - v * s * Math.max(Math.min(k, 4 - k, 1), 0);
+    return [Math.round(f(5) * 255), Math.round(f(3) * 255), Math.round(f(1) * 255)];
+  }
+
+  function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+  }
+
+  function drawColorWheel() {
+    const r = wheelCanvas.width / 2;
+    const img = wheelCtx.createImageData(wheelCanvas.width, wheelCanvas.height);
+    for (let y = 0; y < wheelCanvas.height; y++) {
+      for (let x = 0; x < wheelCanvas.width; x++) {
+        const dx = x - r, dy = y - r;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const idx = (y * wheelCanvas.width + x) * 4;
+        if (dist <= r) {
+          const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+          const sat = dist / r;
+          const [cr, cg, cb] = hsvToRgb(angle, sat, wheelV);
+          img.data[idx] = cr; img.data[idx+1] = cg; img.data[idx+2] = cb; img.data[idx+3] = 255;
+        } else {
+          img.data[idx+3] = 0;
+        }
+      }
     }
-  }, { passive: false });
+    wheelCtx.putImageData(img, 0, 0);
 
-  canvas.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    if (e.touches.length > 0) {
-      handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    // Marcador da cor atual na roda
+    const rad = wheelH * Math.PI / 180;
+    const mx = r + Math.cos(rad) * (wheelS * r);
+    const my = r + Math.sin(rad) * (wheelS * r);
+    wheelCtx.beginPath();
+    wheelCtx.arc(mx, my, 7, 0, Math.PI * 2);
+    wheelCtx.lineWidth = 2.5;
+    wheelCtx.strokeStyle = wheelV > 0.5 ? '#000' : '#fff';
+    wheelCtx.stroke();
+  }
+
+  function updateWheelPreview() {
+    const [r, g, b] = hsvToRgb(wheelH, wheelS, wheelV);
+    const hex = rgbToHex(r, g, b);
+    document.getElementById('wheelPreview').style.backgroundColor = hex;
+    hexInput.value = hex;
+  }
+
+  function syncColorUI() {
+    const hex = rgbToHex(currentColor[0], currentColor[1], currentColor[2]);
+    document.getElementById('currentColorSwatch').style.backgroundColor = hex;
+    document.getElementById('wheelPreview').style.backgroundColor = hex;
+    hexInput.value = hex;
+  }
+
+  function pickFromWheel(clientX, clientY) {
+    const rect = wheelCanvas.getBoundingClientRect();
+    const r = wheelCanvas.width / 2;
+    const x = ((clientX - rect.left) / rect.width) * wheelCanvas.width - r;
+    const y = ((clientY - rect.top) / rect.height) * wheelCanvas.height - r;
+    const dist = Math.min(r, Math.sqrt(x * x + y * y));
+    wheelH = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    wheelS = dist / r;
+    drawColorWheel();
+    updateWheelPreview();
+  }
+
+  let wheelDragging = false;
+  wheelCanvas.addEventListener('touchstart', e => { e.preventDefault(); wheelDragging = true; pickFromWheel(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  wheelCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (wheelDragging) pickFromWheel(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  wheelCanvas.addEventListener('touchend', () => wheelDragging = false);
+  wheelCanvas.addEventListener('mousedown', e => { wheelDragging = true; pickFromWheel(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', e => { if (wheelDragging) pickFromWheel(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', () => wheelDragging = false);
+
+  valSlider.addEventListener('input', () => {
+    wheelV = valSlider.value / 100;
+    document.getElementById('valLabel').textContent = `${valSlider.value}%`;
+    drawColorWheel();
+    updateWheelPreview();
+  });
+
+  hexInput.addEventListener('input', () => {
+    if (/^#[0-9A-Fa-f]{6}$/.test(hexInput.value)) {
+      document.getElementById('wheelPreview').style.backgroundColor = hexInput.value;
     }
-  }, { passive: false });
-
-  canvas.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    handleEnd();
-  }, { passive: false });
-
-  canvas.addEventListener('touchcancel', (e) => {
-    e.preventDefault();
-    handleEnd();
-  }, { passive: false });
-
-  // Eventos Mouse Nativos (Desktop)
-  canvas.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
-    handleStart(e.clientX, e.clientY);
   });
 
-  window.addEventListener('mousemove', (e) => {
-    if (!isDrawing && e.target !== canvas) return;
-    handleMove(e.clientX, e.clientY);
+  document.getElementById('btnColorWheel').addEventListener('click', () => {
+    drawColorWheel();
+    colorModal.classList.remove('hidden');
+  });
+  document.getElementById('closeColorModal').addEventListener('click', () => colorModal.classList.add('hidden'));
+  document.getElementById('confirmColorBtn').addEventListener('click', () => {
+    const hex = hexInput.value;
+    if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+      currentColor = [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16), 255];
+      syncColorUI();
+    }
+    colorModal.classList.add('hidden');
   });
 
-  window.addEventListener('mouseup', () => {
-    handleEnd();
+  // --- QUANTIZAÇÃO DE CORES (Para Importação e Simplificação) ---
+  function quantizeBuffer(buf, maxColors) {
+    // Coleta cores opacas
+    const samples = [];
+    for (let i = 0; i < buf.length; i += 4) {
+      if (buf[i+3] >= 128) samples.push([buf[i], buf[i+1], buf[i+2]]);
+    }
+    if (samples.length === 0) return;
+
+    // K-Means rápido para extrair a paleta dominante
+    const k = Math.min(maxColors, samples.length);
+    const palette = [];
+    const step = Math.max(1, Math.floor(samples.length / k));
+    for (let i = 0; i < k; i++) palette.push([...samples[i * step]]);
+
+    for (let iter = 0; iter < 5; iter++) {
+      const sums = Array.from({ length: k }, () => [0, 0, 0, 0]);
+      for (const p of samples) {
+        let best = 0, bestD = Infinity;
+        for (let c = 0; c < k; c++) {
+          const d = (p[0]-palette[c][0])**2 + (p[1]-palette[c][1])**2 + (p[2]-palette[c][2])**2;
+          if (d < bestD) { bestD = d; best = c; }
+        }
+        sums[best][0] += p[0]; sums[best][1] += p[1]; sums[best][2] += p[2]; sums[best][3]++;
+      }
+      for (let c = 0; c < k; c++) {
+        if (sums[c][3] > 0) {
+          palette[c] = [Math.round(sums[c][0]/sums[c][3]), Math.round(sums[c][1]/sums[c][3]), Math.round(sums[c][2]/sums[c][3])];
+        }
+      }
+    }
+
+    // Mapeia todos os pixels para a paleta reduzida
+    for (let i = 0; i < buf.length; i += 4) {
+      if (buf[i+3] < 128) {
+        buf[i+3] = 0;
+        continue;
+      }
+      let best = 0, bestD = Infinity;
+      for (let c = 0; c < k; c++) {
+        const d = (buf[i]-palette[c][0])**2 + (buf[i+1]-palette[c][1])**2 + (buf[i+2]-palette[c][2])**2;
+        if (d < bestD) { bestD = d; best = c; }
+      }
+      buf[i] = palette[best][0]; buf[i+1] = palette[best][1]; buf[i+2] = palette[best][2]; buf[i+3] = 255;
+    }
+  }
+
+  // --- MODAL IMPORTAR IMAGEM COM LIMITE DE PIXELS ---
+  const importModal = document.getElementById('importModal');
+  const impColors = document.getElementById('impColors');
+  impColors.addEventListener('input', () => document.getElementById('impColorsLabel').textContent = `${impColors.value} cores`);
+
+  document.getElementById('btnOpenImport').addEventListener('click', () => importModal.classList.remove('hidden'));
+  document.getElementById('closeImportModal').addEventListener('click', () => importModal.classList.add('hidden'));
+
+  document.getElementById('confirmImportBtn').addEventListener('click', () => {
+    const file = document.getElementById('fileInput').files[0];
+    if (!file) return alert('Selecione uma imagem primeiro.');
+
+    let targetW = parseInt(document.getElementById('impW').value) || 32;
+    let targetH = parseInt(document.getElementById('impH').value) || 32;
+    const maxPixels = parseInt(document.getElementById('impMaxPixels').value) || 4096;
+    const maxColors = parseInt(impColors.value) || 16;
+
+    // Aplica o limite máximo de pixels mantendo a proporção
+    if (targetW * targetH > maxPixels) {
+      const scale = Math.sqrt(maxPixels / (targetW * targetH));
+      targetW = Math.max(4, Math.floor(targetW * scale));
+      targetH = Math.max(4, Math.floor(targetH * scale));
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        commitSelection();
+        saveState();
+        const off = document.createElement('canvas');
+        off.width = targetW; off.height = targetH;
+        const ctx = off.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+        const raw = new Uint8Array(ctx.getImageData(0, 0, targetW, targetH).data);
+        quantizeBuffer(raw, maxColors);
+
+        gridW = targetW; gridH = targetH; pixels = raw;
+        fitCanvas();
+        render();
+        updateStatus(0, 0);
+        importModal.classList.add('hidden');
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
   });
 
-  // Botões
+  // --- MODAL REDIMENSIONAR / AMPLIFICAR / SIMPLIFICAR ---
+  const resizeModal = document.getElementById('resizeModal');
+  const resMode = document.getElementById('resMode');
+  const resColors = document.getElementById('resColors');
+
+  resMode.addEventListener('change', () => {
+    document.getElementById('simplifyColorsWrap').classList.toggle('hidden', resMode.value !== 'simplify');
+    document.getElementById('simplifyColorsWrap').classList.toggle('flex', resMode.value === 'simplify');
+  });
+  resColors.addEventListener('input', () => document.getElementById('resColorsLabel').textContent = `${resColors.value} cores`);
+
+  document.getElementById('btnOpenResize').addEventListener('click', () => {
+    document.getElementById('resW').value = gridW;
+    document.getElementById('resH').value = gridH;
+    resizeModal.classList.remove('hidden');
+  });
+  document.getElementById('closeResizeModal').addEventListener('click', () => resizeModal.classList.add('hidden'));
+
+  document.getElementById('confirmResizeBtn').addEventListener('click', () => {
+    const newW = Math.max(4, Math.min(256, parseInt(document.getElementById('resW').value) || gridW));
+    const newH = Math.max(4, Math.min(256, parseInt(document.getElementById('resH').value) || gridH));
+    const mode = resMode.value;
+
+    commitSelection();
+    saveState();
+
+    const newBuf = new Uint8Array(newW * newH * 4);
+
+    if (mode === 'amplify') {
+      // Nearest-neighbor puro: amplifica os pixels sem borrar
+      for (let y = 0; y < newH; y++) {
+        const srcY = Math.floor((y / newH) * gridH);
+        for (let x = 0; x < newW; x++) {
+          const srcX = Math.floor((x / newW) * gridW);
+          const sIdx = (srcY * gridW + srcX) * 4;
+          const dIdx = (y * newW + x) * 4;
+          newBuf[dIdx] = pixels[sIdx]; newBuf[dIdx+1] = pixels[sIdx+1];
+          newBuf[dIdx+2] = pixels[sIdx+2]; newBuf[dIdx+3] = pixels[sIdx+3];
+        }
+      }
+    } else {
+      // Usa canvas auxiliar para reamostragem e depois quantiza/limpa
+      const srcCanvas = document.createElement('canvas');
+      srcCanvas.width = gridW; srcCanvas.height = gridH;
+      srcCanvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(pixels), gridW, gridH), 0, 0);
+
+      const dstCanvas = document.createElement('canvas');
+      dstCanvas.width = newW; dstCanvas.height = newH;
+      const dCtx = dstCanvas.getContext('2d');
+      dCtx.imageSmoothingEnabled = (mode === 'smooth');
+      dCtx.drawImage(srcCanvas, 0, 0, newW, newH);
+
+      const resData = new Uint8Array(dCtx.getImageData(0, 0, newW, newH).data);
+      if (mode === 'simplify') {
+        quantizeBuffer(resData, parseInt(resColors.value) || 8);
+      } else {
+        // Limpa semi-transparências para manter estética pixel art
+        for (let i = 0; i < resData.length; i += 4) resData[i+3] = resData[i+3] >= 128 ? 255 : 0;
+      }
+      newBuf.set(resData);
+    }
+
+    gridW = newW; gridH = newH; pixels = newBuf;
+    fitCanvas();
+    render();
+    updateStatus(0, 0);
+    resizeModal.classList.add('hidden');
+  });
+
+  // --- BOTÕES INFERIORES & ATALHOS ---
   document.getElementById('btnUndo').addEventListener('click', undo);
   document.getElementById('btnRedo').addEventListener('click', redo);
-  
-  document.getElementById('btnGrid').addEventListener('click', (e) => {
+  document.getElementById('btnGrid').addEventListener('click', e => {
     showGrid = !showGrid;
-    gl.uniform1f(uShowGridLoc, showGrid ? 1.0 : 0.0);
     e.currentTarget.classList.toggle('active', showGrid);
     render();
   });
-
   document.getElementById('btnClear').addEventListener('click', () => {
+    commitSelection();
     saveState();
-    for (let i = 0; i < pixels.length; i += 4) {
-      pixels[i] = BG_COLOR[0]; pixels[i+1] = BG_COLOR[1]; pixels[i+2] = BG_COLOR[2]; pixels[i+3] = BG_COLOR[3];
-    }
+    pixels.fill(0);
     render();
   });
 
-  document.getElementById('btnExport').addEventListener('click', () => {
-    gl.uniform1f(uShowGridLoc, 0.0);
-    render();
-    const a = document.createElement('a');
-    a.download = 'pixelbras-art.png';
-    a.href = canvas.toDataURL();
-    a.click();
-    gl.uniform1f(uShowGridLoc, showGrid ? 1.0 : 0.0);
-    render();
-  });
-
-  // Atalhos Teclado
-  window.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-      e.preventDefault();
-      if (e.shiftKey) redo(); else undo();
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-      e.preventDefault();
-      redo();
-    } else if (!e.ctrlKey && !e.metaKey) {
-      const key = e.key.toLowerCase();
-      if (key === 'b') selectTool('brush');
-      if (key === 'g') selectTool('bucket');
-      if (key === 'i') selectTool('picker');
-      if (key === 'l') selectTool('line');
-      if (key === 'r') selectTool('rect');
-      if (key === 'e') selectTool('eraser');
+  window.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+    else if (e.key === 'Enter' && selection) { commitSelection(); }
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && selection) { selection = null; updateSelectionBar(); render(); }
+    else if (!e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+      const k = e.key.toLowerCase();
+      if (k === 'b') selectTool('brush');
+      if (k === 'g') selectTool('bucket');
+      if (k === 'i') selectTool('picker');
+      if (k === 'l') selectTool('line');
+      if (k === 'r') selectTool('rect');
+      if (k === 'm') selectTool('select');
+      if (k === 'e') selectTool('eraser');
     }
   });
 
-  // Inicialização
-  for (let i = 0; i < pixels.length; i += 4) {
-    pixels[i] = BG_COLOR[0]; pixels[i+1] = BG_COLOR[1]; pixels[i+2] = BG_COLOR[2]; pixels[i+3] = BG_COLOR[3];
-  }
+  fitCanvas();
   render();
 </script>
 </body>
