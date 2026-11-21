@@ -70,7 +70,8 @@
     </div>
 
     <div class="w-px h-6 bg-zinc-700 mx-0.5 shrink-0"></div>
-    <!-- Controle de Pincel, Camadas, Arquivo e Fundo -->
+
+    <!-- Controle de Camadas, Animação, Arquivo e Fundo -->
     <div class="flex items-center gap-1.5 shrink-0 pr-2">
       <button id="btnToggleLayers" class="px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-purple-400 active:scale-95" title="Camadas">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
@@ -90,7 +91,7 @@
     </div>
   </header>
 
-  <!-- Barra Contextual de Seleção (Aparece quando há área selecionada) -->
+  <!-- Barra Contextual de Seleção -->
   <div id="selectionBar" class="hidden w-full bg-emerald-950/90 border-b border-emerald-700/60 px-3 py-1.5 flex items-center justify-between text-xs z-10">
     <span class="text-emerald-300 font-medium">Arraste para mover a seleção</span>
     <div class="flex gap-1.5">
@@ -99,7 +100,7 @@
     </div>
   </div>
 
-  <!-- Área Central WebGL com Imagem de Fundo Customizável e Zoom -->
+  <!-- Área Central WebGL com Zoom e Pan -->
   <main id="workspace" class="flex-1 w-full flex items-center justify-center p-2 overflow-hidden relative bg-cover bg-center">
     <canvas id="glcanvas" width="512" height="512" class="border-2 border-zinc-700 shadow-2xl rounded-sm cursor-crosshair"></canvas>
 
@@ -114,7 +115,7 @@
     <!-- Painel Flutuante de Camadas -->
     <div id="layersPanel" class="hidden absolute top-3 right-3 w-56 bg-zinc-900/95 border border-zinc-700 rounded-xl p-3 shadow-2xl z-20 flex flex-col gap-2 backdrop-blur-sm">
       <div class="flex items-center justify-between border-b border-zinc-800 pb-1.5">
-        <span class="text-xs font-bold text-purple-400">Camadas</span>
+        <span class="text-xs font-bold text-purple-400">Camadas (Quadro #<span id="layerFrameNum">1</span>)</span>
         <div class="flex gap-1">
           <button id="btnAddLayer" class="px-2 py-0.5 rounded bg-purple-600 text-white text-xs font-bold" title="Nova Camada">+ Nova</button>
           <button id="btnCloseLayers" class="px-1.5 text-zinc-400 hover:text-white text-sm">&times;</button>
@@ -123,25 +124,6 @@
       <div id="layersList" class="flex flex-col gap-1 max-h-48 overflow-y-auto text-xs"></div>
     </div>
   </main>
-
-  <!-- MODAL 4: IMAGEM DE FUNDO DA TELA DE APRESENTAÇÃO -->
-  <div id="bgModal" class="hidden fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl p-4 w-full max-w-xs flex flex-col gap-3 shadow-2xl">
-      <div class="flex justify-between items-center">
-        <span class="font-bold text-sm text-pink-400">Fundo da Tela de Apresentação</span>
-        <button id="closeBgModal" class="text-zinc-400 hover:text-white text-lg leading-none px-2">&times;</button>
-      </div>
-      <label class="flex flex-col gap-1 text-xs">
-        <span class="text-zinc-400">Enviar imagem de fundo (galeria/PC):</span>
-        <input type="file" id="bgFileInput" accept="image/*" class="text-xs text-zinc-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-zinc-800 file:text-pink-400">
-      </label>
-      <label class="flex flex-col gap-1 text-xs">
-        <span class="text-zinc-400">Ou cor sólida de fundo:</span>
-        <input type="color" id="bgSolidColor" value="#121214" class="w-full h-8 rounded cursor-pointer bg-zinc-800 border border-zinc-700">
-      </label>
-      <button id="btnResetBg" class="w-full py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-zinc-300">Restaurar Fundo Padrão</button>
-    </div>
-  </div>
 
   <!-- PAINEL DE ANIMAÇÃO (TIMELINE, ONION SKIN, FPS E EXPORTAÇÃO GIF/WEBP ANIMADOS) -->
   <section id="animPanel" class="hidden w-full bg-zinc-900/95 border-t border-zinc-800 px-2.5 py-2 flex flex-col gap-2 shrink-0 z-20">
@@ -178,15 +160,15 @@
   <!-- Barra Inferior -->
   <footer class="w-full bg-zinc-900 border-t border-zinc-800 px-2.5 py-1.5 flex items-center justify-between gap-1.5 shrink-0 z-20">
     <div class="flex items-center gap-1">
-      <button id="btnUndo" disabled class="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold disabled:opacity-35 active:scale-95">
+      <button id="btnUndo" disabled class="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold disabled:opacity-35 active:scale-95" title="Desfazer (Ctrl+Z)">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
       </button>
-      <button id="btnRedo" disabled class="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold disabled:opacity-35 active:scale-95">
+      <button id="btnRedo" disabled class="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold disabled:opacity-35 active:scale-95" title="Refazer (Ctrl+Y)">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
       </button>
     </div>
 
-    <div id="statusText" class="text-[11px] font-mono text-zinc-400 truncate">32x32 | 0, 0</div>
+    <div id="statusText" class="text-[11px] font-mono text-zinc-400 truncate">32x32 | Camada 1 | 0, 0</div>
 
     <div class="flex items-center gap-1">
       <button id="btnFullscreen" class="px-2 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-zinc-300 active:scale-95" title="Tela Cheia">
@@ -195,15 +177,13 @@
       <button id="btnGrid" class="tool-btn active px-2 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold active:scale-95" title="Grade">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
       </button>
-      <button id="btnClear" class="px-2 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-red-400 active:scale-95" title="Limpar Tudo">
+      <button id="btnClear" class="px-2 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-red-400 active:scale-95" title="Limpar Camada Atual">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
       </button>
       <button id="btnExport" class="flex items-center gap-1 px-2 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold active:scale-95" title="Exportar PNG Transparente">
-        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span>PNG</span>
       </button>
       <button id="btnExportWebp" class="flex items-center gap-1 px-2 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-zinc-950 text-xs font-bold active:scale-95" title="Exportar WebP Transparente">
-        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span>WebP</span>
       </button>
     </div>
@@ -216,7 +196,6 @@
       <button id="closeBrushPanel" class="text-zinc-400 hover:text-white text-base leading-none px-1.5">&times;</button>
     </div>
 
-    <!-- Slider de Tamanho -->
     <div class="flex flex-col gap-1 text-xs">
       <div class="flex justify-between">
         <span class="text-zinc-400">Tamanho do Traço:</span>
@@ -225,7 +204,6 @@
       <input type="range" id="brushSizeSlider" min="1" max="16" value="1" class="w-full accent-emerald-500 cursor-pointer">
     </div>
 
-    <!-- Formatos Pré-definidos -->
     <div class="flex flex-col gap-1.5 text-xs">
       <span class="text-zinc-400">Formato do Pincel:</span>
       <div id="brushShapesList" class="grid grid-cols-4 gap-1.5">
@@ -236,13 +214,11 @@
       </div>
     </div>
 
-    <!-- Formatos Personalizados Salvos -->
     <div id="customBrushesWrap" class="hidden flex-col gap-1.5 text-xs border-t border-zinc-800 pt-2">
       <span class="text-zinc-400">Meus Formatos Salvos:</span>
       <div id="customBrushesList" class="flex flex-wrap gap-1.5"></div>
     </div>
 
-    <!-- Criador de Formato Arbitrário (Matriz 7x7) -->
     <div class="flex flex-col gap-2 text-xs border-t border-zinc-800 pt-2">
       <div class="flex items-center justify-between">
         <span class="text-zinc-400 font-medium">Criar Formato Arbitrário (7×7):</span>
@@ -306,7 +282,6 @@
       <label class="flex flex-col gap-1 text-xs">
         <span class="text-zinc-400">Limite máximo de pixels (ex: 4096 = 64x64):</span>
         <input type="number" id="impMaxPixels" value="4096" min="64" max="65536" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
-        <span id="impLimitHint" class="text-[11px] text-zinc-500">Se L × A ultrapassar o limite, será ajustado proporcionalmente.</span>
       </label>
 
       <label class="flex flex-col gap-1 text-xs">
@@ -322,7 +297,7 @@
         <span>Tornar cor de fundo transparente (canto superior)</span>
       </label>
 
-      <button id="confirmImportBtn" class="w-full py-2.5 rounded-lg bg-sky-500 text-zinc-950 font-bold text-xs mt-1">Importar para Tela</button>
+      <button id="confirmImportBtn" class="w-full py-2.5 rounded-lg bg-sky-500 text-zinc-950 font-bold text-xs mt-1">Importar para Camada Ativa</button>
     </div>
   </div>
 
@@ -362,50 +337,88 @@
         <input type="range" id="resColors" min="2" max="32" value="8" class="w-full accent-amber-400">
       </label>
 
-      <button id="confirmResizeBtn" class="w-full py-2.5 rounded-lg bg-amber-400 text-zinc-950 font-bold text-xs mt-1">Aplicar Transformação</button>
+      <button id="confirmResizeBtn" class="w-full py-2.5 rounded-lg bg-amber-400 text-zinc-950 font-bold text-xs mt-1">Aplicar em Todas as Camadas</button>
+    </div>
+  </div>
+
+  <!-- MODAL 4: IMAGEM DE FUNDO DA TELA DE APRESENTAÇÃO -->
+  <div id="bgModal" class="hidden fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl p-4 w-full max-w-xs flex flex-col gap-3 shadow-2xl">
+      <div class="flex justify-between items-center">
+        <span class="font-bold text-sm text-pink-400">Fundo da Tela de Apresentação</span>
+        <button id="closeBgModal" class="text-zinc-400 hover:text-white text-lg leading-none px-2">&times;</button>
+      </div>
+      <label class="flex flex-col gap-1 text-xs">
+        <span class="text-zinc-400">Enviar imagem de fundo (galeria/PC):</span>
+        <input type="file" id="bgFileInput" accept="image/*" class="text-xs text-zinc-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-zinc-800 file:text-pink-400">
+      </label>
+      <label class="flex flex-col gap-1 text-xs">
+        <span class="text-zinc-400">Ou cor sólida de fundo:</span>
+        <input type="color" id="bgSolidColor" value="#121214" class="w-full h-8 rounded cursor-pointer bg-zinc-800 border border-zinc-700">
+      </label>
+      <button id="btnResetBg" class="w-full py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-zinc-300">Restaurar Fundo Padrão</button>
     </div>
   </div>
 
 <script>
-  // --- ESTADO GLOBAL DO CANVAS (COM CAMADAS, PINCEL VARIÁVEL E ZOOM) ---
-  let gridW = 32;
-  let gridH = 32;
-  let frames = [{
-    id: 1,
-    layers: [{ id: 1, name: 'Camada 1', visible: true, data: new Uint8Array(gridW * gridH * 4) }],
-    activeLayerIdx: 0
-  }];
-  let activeFrameIdx = 0;
-  let frameCounter = 1;
-  let onionSkin = false;
-  let isPlaying = false;
-  let playTimer = null;
-  let fps = 8;
+  // =========================================================================
+  // 1. FONTE ÚNICA DE VERDADE (ESTADO CENTRALIZADO DE QUADROS E CAMADAS)
+  // =========================================================================
+  const state = {
+    gridW: 32,
+    gridH: 32,
+    frames: [
+      {
+        id: 1,
+        activeLayerIdx: 0,
+        layers: [{ id: 1, name: 'Camada 1', visible: true, data: new Uint8Array(32 * 32 * 4) }]
+      }
+    ],
+    activeFrameIdx: 0,
+    frameCounter: 1,
+    layerCounter: 1,
+    currentColor: [4, 211, 97, 255],
+    currentTool: 'brush',
+    brushSize: 1,
+    brushShape: 'square',
+    activeCustomMatrix: null,
+    showGrid: true,
+    onionSkin: false,
+    isPlaying: false,
+    fps: 8,
+    zoomLevel: 1,
+    panX: 0,
+    panY: 0,
+    selection: null // { x, y, w, h, data: Uint8Array }
+  };
 
-  let layers = frames[0].layers;
-  let activeLayerIdx = 0;
-  let layerCounter = 1;
-  let pixels = layers[0].data; // Aponta sempre para a camada ativa do quadro ativo
-  let brushSize = 1;
-  let brushShape = 'square'; // 'square' | 'circle' | 'diamond' | 'cross' | 'custom'
-  let activeCustomMatrix = null; // Array 7x7 de 0/1
-  let savedCustomBrushes = JSON.parse(localStorage.getItem('pixelbras_custom_brushes') || '[]');
-  let zoomLevel = 1;
-  let panX = 0, panY = 0;
-  let currentColor = [4, 211, 97, 255];
-  let currentTool = 'brush';
-  let showGrid = true;
+  function getActiveFrame() {
+    state.activeFrameIdx = Math.max(0, Math.min(state.activeFrameIdx, state.frames.length - 1));
+    return state.frames[state.activeFrameIdx];
+  }
 
+  function getActiveLayer() {
+    const fr = getActiveFrame();
+    fr.activeLayerIdx = Math.max(0, Math.min(fr.activeLayerIdx, fr.layers.length - 1));
+    return fr.layers[fr.activeLayerIdx];
+  }
+
+  function getActivePixels() {
+    return getActiveLayer().data;
+  }
+
+  // =========================================================================
+  // 2. CONFIGURAÇÃO WEBGL (CANAL ALFA, GRADE, ONION SKIN E SELEÇÃO)
+  // =========================================================================
   const canvas = document.getElementById('glcanvas');
   const workspace = document.getElementById('workspace');
   const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true, alpha: true });
 
-  // Ajusta proporção na tela (Mobile & Desktop)
   function fitCanvas() {
     const rect = workspace.getBoundingClientRect();
     const availW = rect.width - 16;
     const availH = rect.height - 16;
-    const ratio = gridW / gridH;
+    const ratio = state.gridW / state.gridH;
     let drawW = availW;
     let drawH = availW / ratio;
     if (drawH > availH) {
@@ -416,13 +429,13 @@
     canvas.style.height = Math.floor(drawH) + 'px';
     applyTransform();
   }
+
   function applyTransform() {
-    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
-    document.getElementById('zoomLabel').textContent = `${Math.round(zoomLevel * 100)}%`;
+    canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`;
+    document.getElementById('zoomLabel').textContent = `${Math.round(state.zoomLevel * 100)}%`;
   }
   window.addEventListener('resize', fitCanvas);
 
-  // --- SHADERS WEBGL (Com Fundo Xadrez de Transparência + Grade + Seleção) ---
   const vsSource = `
     attribute vec2 a_pos;
     varying vec2 v_uv;
@@ -442,18 +455,16 @@
     uniform float u_onionSkin;
     uniform vec2 u_gridSize;
     uniform float u_showGrid;
-    uniform vec4 u_selRect; // x, y, w, h (w < 0 se inativo)
+    uniform vec4 u_selRect;
 
     void main() {
       vec2 pixelCoord = v_uv * u_gridSize;
       vec2 cell = floor(pixelCoord);
 
-      // Fundo xadrez (checkerboard) para indicar transparência real
       float checker = mod(cell.x + cell.y, 2.0);
       vec3 bg = mix(vec3(0.14, 0.14, 0.16), vec3(0.19, 0.19, 0.22), checker);
       vec3 finalColor = bg;
 
-      // Onion Skin: quadro anterior (tingido de vermelho) e próximo (tingido de ciano)
       if (u_onionSkin > 0.5) {
         vec4 prevCol = texture2D(u_prevTex, v_uv);
         vec4 nextCol = texture2D(u_nextTex, v_uv);
@@ -470,14 +481,12 @@
       vec4 texColor = texture2D(u_tex, v_uv);
       finalColor = mix(finalColor, texColor.rgb, texColor.a);
 
-      // Grade de pixels
       if (u_showGrid > 0.5) {
         vec2 gridPos = fract(pixelCoord);
         float line = step(0.94, gridPos.x) + step(0.94, gridPos.y);
         finalColor = mix(finalColor, vec3(0.32, 0.32, 0.36), min(line, 1.0) * 0.45);
       }
 
-      // Contorno da Ferramenta de Seleção
       if (u_selRect.z > 0.0 && u_selRect.w > 0.0) {
         bool insideX = cell.x >= u_selRect.x && cell.x < (u_selRect.x + u_selRect.z);
         bool insideY = cell.y >= u_selRect.y && cell.y < (u_selRect.y + u_selRect.w);
@@ -542,55 +551,69 @@
   const prevTex = createPixelTex(1);
   const nextTex = createPixelTex(2);
 
-  // --- HISTÓRICO UNDO / REDO ILIMITADO (Salva dimensões + pixels) ---
+  // =========================================================================
+  // 3. HISTÓRICO UNDO / REDO UNIFICADO
+  // =========================================================================
   const undoStack = [];
   const redoStack = [];
 
-  function cloneLayers(srcLayers = layers) {
-    return srcLayers.map(l => ({ id: l.id, name: l.name, visible: l.visible, data: new Uint8Array(l.data) }));
-  }
-
-  function cloneFrames() {
-    frames[activeFrameIdx].layers = layers;
-    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
-    return frames.map(fr => ({
+  function cloneAllFrames() {
+    return state.frames.map(fr => ({
       id: fr.id,
       activeLayerIdx: fr.activeLayerIdx,
-      layers: cloneLayers(fr.layers)
+      layers: fr.layers.map(l => ({
+        id: l.id,
+        name: l.name,
+        visible: l.visible,
+        data: new Uint8Array(l.data)
+      }))
     }));
   }
 
-  function syncActiveFrameRefs() {
-    activeFrameIdx = Math.max(0, Math.min(activeFrameIdx, frames.length - 1));
-    layers = frames[activeFrameIdx].layers;
-    activeLayerIdx = Math.min(frames[activeFrameIdx].activeLayerIdx, layers.length - 1);
-    pixels = layers[activeLayerIdx].data;
-  }
-
   function saveState() {
-    undoStack.push({ w: gridW, h: gridH, activeFrameIdx, frames: cloneFrames() });
+    undoStack.push({
+      gridW: state.gridW,
+      gridH: state.gridH,
+      activeFrameIdx: state.activeFrameIdx,
+      frames: cloneAllFrames()
+    });
     redoStack.length = 0;
     updateHistoryUI();
+  }
+
+  function restoreSnapshot(snap) {
+    state.gridW = snap.gridW;
+    state.gridH = snap.gridH;
+    state.frames = snap.frames;
+    state.activeFrameIdx = Math.max(0, Math.min(snap.activeFrameIdx, state.frames.length - 1));
+    fitCanvas();
+    refreshAllUI();
   }
 
   function undo() {
     if (undoStack.length === 0) return;
     commitSelection();
-    redoStack.push({ w: gridW, h: gridH, activeFrameIdx, frames: cloneFrames() });
-    const state = undoStack.pop();
-    gridW = state.w; gridH = state.h; frames = state.frames; activeFrameIdx = state.activeFrameIdx;
-    syncActiveFrameRefs();
-    renderLayersUI(); renderFramesUI(); fitCanvas(); render(); updateHistoryUI();
+    redoStack.push({
+      gridW: state.gridW,
+      gridH: state.gridH,
+      activeFrameIdx: state.activeFrameIdx,
+      frames: cloneAllFrames()
+    });
+    restoreSnapshot(undoStack.pop());
+    updateHistoryUI();
   }
 
   function redo() {
     if (redoStack.length === 0) return;
     commitSelection();
-    undoStack.push({ w: gridW, h: gridH, activeFrameIdx, frames: cloneFrames() });
-    const state = redoStack.pop();
-    gridW = state.w; gridH = state.h; frames = state.frames; activeFrameIdx = state.activeFrameIdx;
-    syncActiveFrameRefs();
-    renderLayersUI(); renderFramesUI(); fitCanvas(); render(); updateHistoryUI();
+    undoStack.push({
+      gridW: state.gridW,
+      gridH: state.gridH,
+      activeFrameIdx: state.activeFrameIdx,
+      frames: cloneAllFrames()
+    });
+    restoreSnapshot(redoStack.pop());
+    updateHistoryUI();
   }
 
   function updateHistoryUI() {
@@ -598,131 +621,124 @@
     document.getElementById('btnRedo').disabled = redoStack.length === 0;
   }
 
-  // --- SISTEMA DE SELEÇÃO FLUTUANTE ---
-  let selection = null; // { x, y, w, h, data: Uint8Array }
-  let selDragging = false;
-  let selDragOffset = [0, 0];
-  let selCreating = false;
+  // =========================================================================
+  // 4. COMPOSIÇÃO DETERMINÍSTICA DE CAMADAS E RENDERIZAÇÃO
+  // =========================================================================
+  function getCompositeBuffer(overrideActiveLayerData = null, frameIdx = state.activeFrameIdx) {
+    const fr = state.frames[frameIdx];
+    const comp = new Uint8Array(state.gridW * state.gridH * 4);
+    if (!fr) return comp;
 
-  function updateSelectionBar() {
-    document.getElementById('selectionBar').classList.toggle('hidden', !selection);
-  }
+    for (let i = 0; i < fr.layers.length; i++) {
+      const layer = fr.layers[i];
+      if (!layer.visible) continue;
 
-  function commitSelection() {
-    if (!selection) return;
-    for (let sy = 0; sy < selection.h; sy++) {
-      for (let sx = 0; sx < selection.w; sx++) {
-        const sIdx = (sy * selection.w + sx) * 4;
-        if (selection.data[sIdx + 3] > 0) {
-          setPixel(pixels, gridW, gridH, selection.x + sx, selection.y + sy, [
-            selection.data[sIdx], selection.data[sIdx+1], selection.data[sIdx+2], selection.data[sIdx+3]
-          ]);
-        }
-      }
-    }
-    selection = null;
-    updateSelectionBar();
-    render();
-  }
+      const src = (frameIdx === state.activeFrameIdx && i === fr.activeLayerIdx && overrideActiveLayerData)
+        ? overrideActiveLayerData
+        : layer.data;
 
-  function getCompositeBuffer(overrideActiveBuf = null, frameIdx = activeFrameIdx) {
-    const targetFrame = frames[frameIdx];
-    const targetLayers = targetFrame ? targetFrame.layers : layers;
-    const targetActiveLayer = targetFrame ? targetFrame.activeLayerIdx : activeLayerIdx;
-    const comp = new Uint8Array(gridW * gridH * 4);
-
-    for (let i = 0; i < targetLayers.length; i++) {
-      if (!targetLayers[i].visible) continue;
-      const src = (frameIdx === activeFrameIdx && i === targetActiveLayer && overrideActiveBuf)
-        ? overrideActiveBuf
-        : targetLayers[i].data;
       for (let p = 0; p < comp.length; p += 4) {
-        const a = src[p + 3] / 255;
-        if (a > 0) {
-          const invA = 1 - a;
-          comp[p]     = Math.round(src[p] * a + comp[p] * invA);
-          comp[p + 1] = Math.round(src[p + 1] * a + comp[p + 1] * invA);
-          comp[p + 2] = Math.round(src[p + 2] * a + comp[p + 2] * invA);
-          comp[p + 3] = Math.min(255, Math.round((a + (comp[p + 3] / 255) * invA) * 255));
+        const srcA = src[p + 3];
+        if (srcA === 0) continue;
+
+        if (srcA === 255 || comp[p + 3] === 0) {
+          comp[p]     = src[p];
+          comp[p + 1] = src[p + 1];
+          comp[p + 2] = src[p + 2];
+          comp[p + 3] = srcA;
+        } else {
+          const a = srcA / 255;
+          const dstA = comp[p + 3] / 255;
+          const outA = a + dstA * (1 - a);
+          comp[p]     = Math.round((src[p] * a + comp[p] * dstA * (1 - a)) / outA);
+          comp[p + 1] = Math.round((src[p + 1] * a + comp[p + 1] * dstA * (1 - a)) / outA);
+          comp[p + 2] = Math.round((src[p + 2] * a + comp[p + 2] * dstA * (1 - a)) / outA);
+          comp[p + 3] = Math.round(outA * 255);
         }
       }
     }
-    if (frameIdx === activeFrameIdx && selection) {
-      for (let sy = 0; sy < selection.h; sy++) {
-        for (let sx = 0; sx < selection.w; sx++) {
-          const sIdx = (sy * selection.w + sx) * 4;
-          if (selection.data[sIdx + 3] > 0) {
-            setPixel(comp, gridW, gridH, selection.x + sx, selection.y + sy, [
-              selection.data[sIdx], selection.data[sIdx+1], selection.data[sIdx+2], selection.data[sIdx+3]
+
+    if (frameIdx === state.activeFrameIdx && state.selection) {
+      const sel = state.selection;
+      for (let sy = 0; sy < sel.h; sy++) {
+        for (let sx = 0; sx < sel.w; sx++) {
+          const sIdx = (sy * sel.w + sx) * 4;
+          if (sel.data[sIdx + 3] > 0) {
+            setPixelRaw(comp, state.gridW, state.gridH, sel.x + sx, sel.y + sy, [
+              sel.data[sIdx], sel.data[sIdx+1], sel.data[sIdx+2], sel.data[sIdx+3]
             ]);
           }
         }
       }
     }
+
     return comp;
   }
 
-  function render(customBuf = null, tempSelRect = null) {
-    const bufToDraw = customBuf || getCompositeBuffer();
-    gl.uniform2f(uGridSizeLoc, gridW, gridH);
-    gl.uniform1f(uShowGridLoc, showGrid ? 1.0 : 0.0);
-    const showOnion = (onionSkin && !isPlaying && frames.length > 1) ? 1.0 : 0.0;
+  function render(overrideActiveLayerData = null, tempSelRect = null) {
+    const bufToDraw = getCompositeBuffer(overrideActiveLayerData, state.activeFrameIdx);
+    gl.uniform2f(uGridSizeLoc, state.gridW, state.gridH);
+    gl.uniform1f(uShowGridLoc, state.showGrid ? 1.0 : 0.0);
+    const showOnion = (state.onionSkin && !state.isPlaying && state.frames.length > 1) ? 1.0 : 0.0;
     gl.uniform1f(uOnionSkinLoc, showOnion);
 
     if (tempSelRect) {
       gl.uniform4f(uSelRectLoc, tempSelRect.x, tempSelRect.y, tempSelRect.w, tempSelRect.h);
-    } else if (selection) {
-      gl.uniform4f(uSelRectLoc, selection.x, selection.y, selection.w, selection.h);
+    } else if (state.selection) {
+      gl.uniform4f(uSelRectLoc, state.selection.x, state.selection.y, state.selection.w, state.selection.h);
     } else {
       gl.uniform4f(uSelRectLoc, 0, 0, -1, -1);
     }
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gridW, gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, bufToDraw);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, bufToDraw);
 
     if (showOnion > 0.5) {
-      const emptyBuf = new Uint8Array(gridW * gridH * 4);
-      const prevBuf = activeFrameIdx > 0 ? getCompositeBuffer(null, activeFrameIdx - 1) : emptyBuf;
-      const nextBuf = activeFrameIdx < frames.length - 1 ? getCompositeBuffer(null, activeFrameIdx + 1) : emptyBuf;
+      const emptyBuf = new Uint8Array(state.gridW * state.gridH * 4);
+      const prevBuf = state.activeFrameIdx > 0 ? getCompositeBuffer(null, state.activeFrameIdx - 1) : emptyBuf;
+      const nextBuf = state.activeFrameIdx < state.frames.length - 1 ? getCompositeBuffer(null, state.activeFrameIdx + 1) : emptyBuf;
 
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, prevTex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gridW, gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, prevBuf);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, prevBuf);
 
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, nextTex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gridW, gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, nextBuf);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, nextBuf);
     }
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    if (!isPlaying && typeof renderFramesUI === 'function') renderFramesUI();
+    if (!state.isPlaying && !document.getElementById('animPanel').classList.contains('hidden')) {
+      renderFramesUI();
+    }
   }
 
-  // --- OPERAÇÕES DE PIXEL ---
+  // =========================================================================
+  // 5. OPERAÇÕES DE DESENHO E PINCÉIS
+  // =========================================================================
+  function setPixelRaw(buf, w, h, x, y, rgba) {
+    if (x < 0 || x >= w || y < 0 || y >= h) return;
+    const idx = (y * w + x) * 4;
+    buf[idx] = rgba[0]; buf[idx+1] = rgba[1]; buf[idx+2] = rgba[2]; buf[idx+3] = rgba[3];
+  }
+
   function setPixel(buf, w, h, x, y, rgba, size = 1) {
-    if (size <= 1 && (brushShape !== 'custom' || !activeCustomMatrix)) {
-      if (x < 0 || x >= w || y < 0 || y >= h) return;
-      const idx = (y * w + x) * 4;
-      buf[idx] = rgba[0]; buf[idx+1] = rgba[1]; buf[idx+2] = rgba[2]; buf[idx+3] = rgba[3];
+    if (size <= 1 && (state.brushShape !== 'custom' || !state.activeCustomMatrix)) {
+      setPixelRaw(buf, w, h, x, y, rgba);
       return;
     }
 
-    // Se for formato arbitrário salvo (matriz 7x7 escalada pelo brushSize)
-    if (brushShape === 'custom' && activeCustomMatrix && size > 1) {
+    if (state.brushShape === 'custom' && state.activeCustomMatrix && size > 1) {
       const scale = Math.max(1, Math.round(size / 3));
       const total = 7 * scale;
       const offset = Math.floor(total / 2);
       for (let gy = 0; gy < 7; gy++) {
         for (let gx = 0; gx < 7; gx++) {
-          if (!activeCustomMatrix[gy * 7 + gx]) continue;
+          if (!state.activeCustomMatrix[gy * 7 + gx]) continue;
           for (let sy = 0; sy < scale; sy++) {
             for (let sx = 0; sx < scale; sx++) {
-              const px = x + (gx * scale + sx) - offset;
-              const py = y + (gy * scale + sy) - offset;
-              if (px < 0 || px >= w || py < 0 || py >= h) continue;
-              const idx = (py * w + px) * 4;
-              buf[idx] = rgba[0]; buf[idx+1] = rgba[1]; buf[idx+2] = rgba[2]; buf[idx+3] = rgba[3];
+              setPixelRaw(buf, w, h, x + (gx * scale + sx) - offset, y + (gy * scale + sy) - offset, rgba);
             }
           }
         }
@@ -740,21 +756,16 @@
         const ry = dy - center;
         let inside = true;
 
-        if (brushShape === 'circle') {
+        if (state.brushShape === 'circle') {
           inside = (rx * rx + ry * ry) <= (radius * radius);
-        } else if (brushShape === 'diamond') {
+        } else if (state.brushShape === 'diamond') {
           inside = (Math.abs(rx) + Math.abs(ry)) <= radius;
-        } else if (brushShape === 'cross') {
+        } else if (state.brushShape === 'cross') {
           const arm = Math.max(0.6, size * 0.22);
           inside = (Math.abs(rx) <= arm || Math.abs(ry) <= arm);
         }
 
-        if (!inside) continue;
-        const px = x + dx - offset;
-        const py = y + dy - offset;
-        if (px < 0 || px >= w || py < 0 || py >= h) continue;
-        const idx = (py * w + px) * 4;
-        buf[idx] = rgba[0]; buf[idx+1] = rgba[1]; buf[idx+2] = rgba[2]; buf[idx+3] = rgba[3];
+        if (inside) setPixelRaw(buf, w, h, x + dx - offset, y + dy - offset, rgba);
       }
     }
   }
@@ -769,30 +780,32 @@
   }
 
   function floodFill(x, y, fillColor) {
-    const targetColor = getPixel(pixels, gridW, x, y);
+    const targetBuf = getActivePixels();
+    const targetColor = getPixel(targetBuf, state.gridW, x, y);
     if (colorsMatch(targetColor, fillColor)) return false;
+
     const stack = [[x, y]];
-    const visited = new Uint8Array(gridW * gridH);
+    const visited = new Uint8Array(state.gridW * state.gridH);
     while (stack.length > 0) {
       const [cx, cy] = stack.pop();
-      if (cx < 0 || cx >= gridW || cy < 0 || cy >= gridH) continue;
-      const vIdx = cy * gridW + cx;
+      if (cx < 0 || cx >= state.gridW || cy < 0 || cy >= state.gridH) continue;
+      const vIdx = cy * state.gridW + cx;
       if (visited[vIdx]) continue;
       visited[vIdx] = 1;
-      if (colorsMatch(getPixel(pixels, gridW, cx, cy), targetColor)) {
-        setPixel(pixels, gridW, gridH, cx, cy, fillColor);
+      if (colorsMatch(getPixel(targetBuf, state.gridW, cx, cy), targetColor)) {
+        setPixelRaw(targetBuf, state.gridW, state.gridH, cx, cy, fillColor);
         stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
       }
     }
     return true;
   }
 
-  function drawLine(buf, x0, y0, x1, y1, color, size = brushSize) {
+  function drawLine(buf, x0, y0, x1, y1, color, size = state.brushSize) {
     let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
     let err = dx + dy;
     while (true) {
-      setPixel(buf, gridW, gridH, x0, y0, color, size);
+      setPixel(buf, state.gridW, state.gridH, x0, y0, color, size);
       if (x0 === x1 && y0 === y1) break;
       let e2 = 2 * err;
       if (e2 >= dy) { err += dy; x0 += sx; }
@@ -804,54 +817,110 @@
     const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
     const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
     for (let x = minX; x <= maxX; x++) {
-      setPixel(buf, gridW, gridH, x, minY, color);
-      setPixel(buf, gridW, gridH, x, maxY, color);
+      setPixelRaw(buf, state.gridW, state.gridH, x, minY, color);
+      setPixelRaw(buf, state.gridW, state.gridH, x, maxY, color);
     }
     for (let y = minY; y <= maxY; y++) {
-      setPixel(buf, gridW, gridH, minX, y, color);
-      setPixel(buf, gridW, gridH, maxX, y, color);
+      setPixelRaw(buf, state.gridW, state.gridH, minX, y, color);
+      setPixelRaw(buf, state.gridW, state.gridH, maxX, y, color);
     }
   }
 
-  // --- FERRAMENTAS & TOQUE / MOUSE ---
+  // =========================================================================
+  // 6. SELEÇÃO FLUTUANTE
+  // =========================================================================
+  let selDragging = false;
+  let selDragOffset = [0, 0];
+  let selCreating = false;
+
+  function updateSelectionBar() {
+    document.getElementById('selectionBar').classList.toggle('hidden', !state.selection);
+  }
+
+  function commitSelection() {
+    if (!state.selection) return;
+    const sel = state.selection;
+    const targetBuf = getActivePixels();
+    for (let sy = 0; sy < sel.h; sy++) {
+      for (let sx = 0; sx < sel.w; sx++) {
+        const sIdx = (sy * sel.w + sx) * 4;
+        if (sel.data[sIdx + 3] > 0) {
+          setPixelRaw(targetBuf, state.gridW, state.gridH, sel.x + sx, sel.y + sy, [
+            sel.data[sIdx], sel.data[sIdx+1], sel.data[sIdx+2], sel.data[sIdx+3]
+          ]);
+        }
+      }
+    }
+    state.selection = null;
+    updateSelectionBar();
+    render();
+  }
+
+  document.getElementById('btnSelCommit').addEventListener('click', commitSelection);
+  document.getElementById('btnSelDelete').addEventListener('click', () => {
+    state.selection = null;
+    updateSelectionBar();
+    render();
+  });
+
+  // =========================================================================
+  // 7. INTERAÇÃO MOUSE & TOUCH (COM PROTEÇÃO DE 2 DEDOS)
+  // =========================================================================
   const tools = ['brush', 'bucket', 'picker', 'line', 'rect', 'select', 'eraser', 'magic'];
+  const brushPanel = document.getElementById('brushPanel');
+
   function selectTool(name) {
-    if (currentTool === 'select' && name !== 'select') commitSelection();
-    currentTool = name;
+    if (state.currentTool === 'select' && name !== 'select') commitSelection();
+    state.currentTool = name;
     tools.forEach(t => document.getElementById(`tool-${t}`).classList.toggle('active', t === name));
   }
-  const brushPanel = document.getElementById('brushPanel');
-  tools.forEach(t => document.getElementById(`tool-${t}`).addEventListener('click', () => {
-    if (t === 'brush' && currentTool === 'brush') {
-      brushPanel.classList.toggle('hidden');
-      return;
-    }
-    if (t !== 'brush') brushPanel.classList.add('hidden');
-    selectTool(t);
-  }));
 
-  let isDrawing = false, startX = 0, startY = 0, lastX = 0, lastY = 0, snapshot = null;
+  tools.forEach(t => {
+    document.getElementById(`tool-${t}`).addEventListener('click', () => {
+      if (t === 'brush' && state.currentTool === 'brush') {
+        brushPanel.classList.toggle('hidden');
+        return;
+      }
+      if (t !== 'brush') brushPanel.classList.add('hidden');
+      selectTool(t);
+    });
+  });
+
+  let isDrawing = false, startX = 0, startY = 0, lastX = 0, lastY = 0, strokeSnapshot = null;
 
   function getCoords(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor(((clientX - rect.left) / rect.width) * gridW);
-    const y = Math.floor(((clientY - rect.top) / rect.height) * gridH);
-    return [Math.max(0, Math.min(gridW - 1, x)), Math.max(0, Math.min(gridH - 1, y))];
+    const x = Math.floor(((clientX - rect.left) / rect.width) * state.gridW);
+    const y = Math.floor(((clientY - rect.top) / rect.height) * state.gridH);
+    return [Math.max(0, Math.min(state.gridW - 1, x)), Math.max(0, Math.min(state.gridH - 1, y))];
   }
 
-  function updateStatus(x, y) {
-    document.getElementById('statusText').textContent = `${gridW}x${gridH} | ${x}, ${y}`;
+  function updateStatus(x, y, warning = null) {
+    const layer = getActiveLayer();
+    if (warning) {
+      document.getElementById('statusText').innerHTML = `<span class="text-amber-400 font-bold">${warning}</span>`;
+      return;
+    }
+    document.getElementById('statusText').textContent = `${state.gridW}x${state.gridH} | ${layer.name} | ${x}, ${y}`;
   }
 
   function handleStart(clientX, clientY) {
+    stopPlayback();
     const [x, y] = getCoords(clientX, clientY);
     lastX = x; lastY = y;
+
+    const layer = getActiveLayer();
+    if (!layer.visible && state.currentTool !== 'picker') {
+      updateStatus(x, y, `⚠️ ${layer.name} está oculta!`);
+      return;
+    }
     updateStatus(x, y);
 
-    if (currentTool === 'select') {
-      if (selection && x >= selection.x && x < selection.x + selection.w && y >= selection.y && y < selection.y + selection.h) {
+    if (state.currentTool === 'select') {
+      const sel = state.selection;
+      if (sel && x >= sel.x && x < sel.x + sel.w && y >= sel.y && y < sel.y + sel.h) {
         selDragging = true;
-        selDragOffset = [x - selection.x, y - selection.y];
+        selDragOffset = [x - sel.x, y - sel.y];
         return;
       }
       commitSelection();
@@ -861,20 +930,22 @@
       return;
     }
 
-    const activeColor = currentTool === 'eraser' ? [0, 0, 0, 0] : currentColor;
-
-    if (currentTool === 'picker') {
-      const picked = getPixel(pixels, gridW, x, y);
+    if (state.currentTool === 'picker') {
+      // Captura cor visível da composição atual (ou da camada ativa se tiver pixel)
+      const comp = getCompositeBuffer();
+      const picked = getPixel(comp, state.gridW, x, y);
       if (picked[3] > 0) {
-        currentColor = [picked[0], picked[1], picked[2], 255];
+        state.currentColor = [picked[0], picked[1], picked[2], 255];
         syncColorUI();
       }
       selectTool('brush');
       return;
     }
 
-    if (currentTool === 'bucket' || currentTool === 'magic') {
-      const fillCol = currentTool === 'magic' ? [0, 0, 0, 0] : activeColor;
+    const activeColor = state.currentTool === 'eraser' ? [0, 0, 0, 0] : state.currentColor;
+
+    if (state.currentTool === 'bucket' || state.currentTool === 'magic') {
+      const fillCol = state.currentTool === 'magic' ? [0, 0, 0, 0] : activeColor;
       saveState();
       if (!floodFill(x, y, fillCol)) {
         undoStack.pop();
@@ -887,22 +958,23 @@
     saveState();
     isDrawing = true;
     startX = x; startY = y;
-    snapshot = new Uint8Array(pixels);
+    const activeBuf = getActivePixels();
+    strokeSnapshot = new Uint8Array(activeBuf);
 
-    if (currentTool === 'brush' || currentTool === 'eraser') {
-      setPixel(pixels, gridW, gridH, x, y, activeColor, brushSize);
+    if (state.currentTool === 'brush' || state.currentTool === 'eraser') {
+      setPixel(activeBuf, state.gridW, state.gridH, x, y, activeColor, state.brushSize);
       render();
     }
   }
 
   function handleMove(clientX, clientY) {
     const [x, y] = getCoords(clientX, clientY);
-    updateStatus(x, y);
+    if (getActiveLayer().visible) updateStatus(x, y);
 
-    if (currentTool === 'select') {
-      if (selDragging && selection) {
-        selection.x = x - selDragOffset[0];
-        selection.y = y - selDragOffset[1];
+    if (state.currentTool === 'select') {
+      if (selDragging && state.selection) {
+        state.selection.x = x - selDragOffset[0];
+        state.selection.y = y - selDragOffset[1];
         render();
       } else if (selCreating) {
         const minX = Math.min(startX, x), minY = Math.min(startY, y);
@@ -914,25 +986,26 @@
 
     if (!isDrawing) return;
     lastX = x; lastY = y;
-    const activeColor = currentTool === 'eraser' ? [0, 0, 0, 0] : currentColor;
+    const activeColor = state.currentTool === 'eraser' ? [0, 0, 0, 0] : state.currentColor;
+    const activeBuf = getActivePixels();
 
-    if (currentTool === 'brush' || currentTool === 'eraser') {
-      drawLine(pixels, startX, startY, x, y, activeColor);
+    if (state.currentTool === 'brush' || state.currentTool === 'eraser') {
+      drawLine(activeBuf, startX, startY, x, y, activeColor, state.brushSize);
       startX = x; startY = y;
       render();
-    } else if (currentTool === 'line') {
-      const preview = new Uint8Array(snapshot);
-      drawLine(preview, startX, startY, x, y, activeColor);
+    } else if (state.currentTool === 'line') {
+      const preview = new Uint8Array(strokeSnapshot);
+      drawLine(preview, startX, startY, x, y, activeColor, state.brushSize);
       render(preview);
-    } else if (currentTool === 'rect') {
-      const preview = new Uint8Array(snapshot);
+    } else if (state.currentTool === 'rect') {
+      const preview = new Uint8Array(strokeSnapshot);
       drawRect(preview, startX, startY, x, y, activeColor);
       render(preview);
     }
   }
 
   function handleEnd() {
-    if (currentTool === 'select') {
+    if (state.currentTool === 'select') {
       if (selDragging) {
         selDragging = false;
         return;
@@ -942,16 +1015,17 @@
         const minX = Math.min(startX, lastX), minY = Math.min(startY, lastY);
         const w = Math.abs(lastX - startX) + 1, h = Math.abs(lastY - startY) + 1;
         saveState();
+        const activeBuf = getActivePixels();
         const selData = new Uint8Array(w * h * 4);
         for (let sy = 0; sy < h; sy++) {
           for (let sx = 0; sx < w; sx++) {
-            const p = getPixel(pixels, gridW, minX + sx, minY + sy);
+            const p = getPixel(activeBuf, state.gridW, minX + sx, minY + sy);
             const dIdx = (sy * w + sx) * 4;
             selData[dIdx] = p[0]; selData[dIdx+1] = p[1]; selData[dIdx+2] = p[2]; selData[dIdx+3] = p[3];
-            setPixel(pixels, gridW, gridH, minX + sx, minY + sy, [0, 0, 0, 0]);
+            setPixelRaw(activeBuf, state.gridW, state.gridH, minX + sx, minY + sy, [0, 0, 0, 0]);
           }
         }
-        selection = { x: minX, y: minY, w, h, data: selData };
+        state.selection = { x: minX, y: minY, w, h, data: selData };
         updateSelectionBar();
         render();
       }
@@ -959,18 +1033,19 @@
     }
 
     if (!isDrawing) return;
-    if (currentTool === 'line') {
-      drawLine(pixels, startX, startY, lastX, lastY, currentColor);
+    const activeBuf = getActivePixels();
+    if (state.currentTool === 'line') {
+      drawLine(activeBuf, startX, startY, lastX, lastY, state.currentColor, state.brushSize);
       render();
-    } else if (currentTool === 'rect') {
-      drawRect(pixels, startX, startY, lastX, lastY, currentColor);
+    } else if (state.currentTool === 'rect') {
+      drawRect(activeBuf, startX, startY, lastX, lastY, state.currentColor);
       render();
     }
     isDrawing = false;
-    snapshot = null;
+    strokeSnapshot = null;
   }
 
-  // Listeners Touch + Mouse (com proteção contra risco acidental no Zoom/Pan de 2 dedos)
+  // Touch com proteção de 2 dedos para Zoom/Pan
   let touchTimer = null;
   let pendingTouch = null;
   let isTwoFingerGesture = false;
@@ -982,17 +1057,11 @@
     }
     pendingTouch = null;
     if (isDrawing) {
-      // Reverte o traço parcial que acabou de começar antes do 2º dedo tocar
       isDrawing = false;
-      snapshot = null;
+      strokeSnapshot = null;
       if (undoStack.length > 0) {
-        const prev = undoStack.pop();
-        layers = prev.layers;
-        activeLayerIdx = prev.activeIdx;
-        pixels = layers[activeLayerIdx].data;
-        renderLayersUI();
+        restoreSnapshot(undoStack.pop());
         updateHistoryUI();
-        render();
       }
     }
     selCreating = false;
@@ -1016,7 +1085,7 @@
           pendingTouch = null;
         }
         touchTimer = null;
-      }, 65);
+      }, 60);
     }
   }, { passive: false });
 
@@ -1030,9 +1099,8 @@
     if (e.touches.length === 1) {
       const tx = e.touches[0].clientX;
       const ty = e.touches[0].clientY;
-      // Se moveu bastante com 1 dedo antes dos 65ms, confirma imediatamente o desenho
       if (pendingTouch) {
-        if (Math.hypot(tx - pendingTouch.x, ty - pendingTouch.y) > 6) {
+        if (Math.hypot(tx - pendingTouch.x, ty - pendingTouch.y) > 5) {
           clearTimeout(touchTimer);
           touchTimer = null;
           handleStart(pendingTouch.x, pendingTouch.y);
@@ -1056,9 +1124,7 @@
         handleStart(pendingTouch.x, pendingTouch.y);
         pendingTouch = null;
       }
-      if (!isTwoFingerGesture) {
-        handleEnd();
-      }
+      if (!isTwoFingerGesture) handleEnd();
       isTwoFingerGesture = false;
     }
   }, { passive: false });
@@ -1073,435 +1139,448 @@
   window.addEventListener('mousemove', e => { if (isDrawing || selDragging || selCreating || e.target === canvas) handleMove(e.clientX, e.clientY); });
   window.addEventListener('mouseup', handleEnd);
 
-  // Botões Seleção
-  document.getElementById('btnSelCommit').addEventListener('click', commitSelection);
-  document.getElementById('btnSelDelete').addEventListener('click', () => {
-    selection = null;
-    updateSelectionBar();
-    render();
-  });
+  // =========================================================================
+  // 8. EXPORTAÇÃO DETERMINÍSTICA (PNG, WEBP, GIF ANIMADO E WEBP ANIMADO)
+  // =========================================================================
+  function downloadBlob(blob, filename) {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.download = filename;
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
 
-  // --- EXPORTAÇÃO TRANSPARENTE REAL (PNG E WEBP VIA CANVAS 2D RGBA PURO) ---
-  function exportImage(mimeType, ext) {
-    commitSelection();
-    const comp = getCompositeBuffer();
-
-    const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = gridW;
-    exportCanvas.height = gridH;
-    const ctx = exportCanvas.getContext('2d', { alpha: true });
-    ctx.clearRect(0, 0, gridW, gridH);
-
-    // Desenha apenas pixels com alfa > 0, garantindo fundo 100% transparente
-    for (let y = 0; y < gridH; y++) {
-      for (let x = 0; x < gridW; x++) {
-        const idx = (y * gridW + x) * 4;
-        const a = comp[idx + 3];
-        if (a > 0) {
-          ctx.fillStyle = `rgba(${comp[idx]}, ${comp[idx + 1]}, ${comp[idx + 2]}, ${a / 255})`;
-          ctx.fillRect(x, y, 1, 1);
-        }
+  function renderFrameToCanvas2D(frameIdx) {
+    const comp = getCompositeBuffer(null, frameIdx);
+    const clean = new Uint8ClampedArray(comp.length);
+    for (let i = 0; i < comp.length; i += 4) {
+      if (comp[i + 3] > 0) {
+        clean[i]     = comp[i];
+        clean[i + 1] = comp[i + 1];
+        clean[i + 2] = comp[i + 2];
+        clean[i + 3] = comp[i + 3];
       }
     }
-
-    exportCanvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.download = `pixelbras-${gridW}x${gridH}.${ext}`;
-      a.href = url;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1500);
-    }, mimeType, 1.0);
-  }
-
-  document.getElementById('btnExport').addEventListener('click', () => exportImage('image/png', 'png'));
-  document.getElementById('btnExportWebp').addEventListener('click', () => exportImage('image/webp', 'webp'));
-
-  // --- RODA DE CORES HSV INTERATIVA ---
-  const colorModal = document.getElementById('colorModal');
-  const wheelCanvas = document.getElementById('wheelCanvas');
-  const wheelCtx = wheelCanvas.getContext('2d');
-  const valSlider = document.getElementById('valSlider');
-  const hexInput = document.getElementById('hexInput');
-  let wheelH = 147, wheelS = 0.98, wheelV = 0.83;
-
-  function hsvToRgb(h, s, v) {
-    let f = (n, k = (n + h / 60) % 6) => v - v * s * Math.max(Math.min(k, 4 - k, 1), 0);
-    return [Math.round(f(5) * 255), Math.round(f(3) * 255), Math.round(f(1) * 255)];
-  }
-
-  function rgbToHex(r, g, b) {
-    return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
-  }
-
-  function drawColorWheel() {
-    const r = wheelCanvas.width / 2;
-    const img = wheelCtx.createImageData(wheelCanvas.width, wheelCanvas.height);
-    for (let y = 0; y < wheelCanvas.height; y++) {
-      for (let x = 0; x < wheelCanvas.width; x++) {
-        const dx = x - r, dy = y - r;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const idx = (y * wheelCanvas.width + x) * 4;
-        if (dist <= r) {
-          const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
-          const sat = dist / r;
-          const [cr, cg, cb] = hsvToRgb(angle, sat, wheelV);
-          img.data[idx] = cr; img.data[idx+1] = cg; img.data[idx+2] = cb; img.data[idx+3] = 255;
-        } else {
-          img.data[idx+3] = 0;
-        }
-      }
-    }
-    wheelCtx.putImageData(img, 0, 0);
-
-    // Marcador da cor atual na roda
-    const rad = wheelH * Math.PI / 180;
-    const mx = r + Math.cos(rad) * (wheelS * r);
-    const my = r + Math.sin(rad) * (wheelS * r);
-    wheelCtx.beginPath();
-    wheelCtx.arc(mx, my, 7, 0, Math.PI * 2);
-    wheelCtx.lineWidth = 2.5;
-    wheelCtx.strokeStyle = wheelV > 0.5 ? '#000' : '#fff';
-    wheelCtx.stroke();
-  }
-
-  function updateWheelPreview() {
-    const [r, g, b] = hsvToRgb(wheelH, wheelS, wheelV);
-    const hex = rgbToHex(r, g, b);
-    document.getElementById('wheelPreview').style.backgroundColor = hex;
-    hexInput.value = hex;
-  }
-
-  function syncColorUI() {
-    const hex = rgbToHex(currentColor[0], currentColor[1], currentColor[2]);
-    document.getElementById('currentColorSwatch').style.backgroundColor = hex;
-    document.getElementById('wheelPreview').style.backgroundColor = hex;
-    hexInput.value = hex;
-  }
-
-  function pickFromWheel(clientX, clientY) {
-    const rect = wheelCanvas.getBoundingClientRect();
-    const r = wheelCanvas.width / 2;
-    const x = ((clientX - rect.left) / rect.width) * wheelCanvas.width - r;
-    const y = ((clientY - rect.top) / rect.height) * wheelCanvas.height - r;
-    const dist = Math.min(r, Math.sqrt(x * x + y * y));
-    wheelH = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-    wheelS = dist / r;
-    drawColorWheel();
-    updateWheelPreview();
-  }
-
-  let wheelDragging = false;
-  wheelCanvas.addEventListener('touchstart', e => { e.preventDefault(); wheelDragging = true; pickFromWheel(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
-  wheelCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (wheelDragging) pickFromWheel(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
-  wheelCanvas.addEventListener('touchend', () => wheelDragging = false);
-  wheelCanvas.addEventListener('mousedown', e => { wheelDragging = true; pickFromWheel(e.clientX, e.clientY); });
-  window.addEventListener('mousemove', e => { if (wheelDragging) pickFromWheel(e.clientX, e.clientY); });
-  window.addEventListener('mouseup', () => wheelDragging = false);
-
-  valSlider.addEventListener('input', () => {
-    wheelV = valSlider.value / 100;
-    document.getElementById('valLabel').textContent = `${valSlider.value}%`;
-    drawColorWheel();
-    updateWheelPreview();
-  });
-
-  hexInput.addEventListener('input', () => {
-    if (/^#[0-9A-Fa-f]{6}$/.test(hexInput.value)) {
-      document.getElementById('wheelPreview').style.backgroundColor = hexInput.value;
-    }
-  });
-
-  document.getElementById('btnColorWheel').addEventListener('click', () => {
-    drawColorWheel();
-    colorModal.classList.remove('hidden');
-  });
-  document.getElementById('closeColorModal').addEventListener('click', () => colorModal.classList.add('hidden'));
-  document.getElementById('confirmColorBtn').addEventListener('click', () => {
-    const hex = hexInput.value;
-    if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
-      currentColor = [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16), 255];
-      syncColorUI();
-    }
-    colorModal.classList.add('hidden');
-  });
-
-  // --- QUANTIZAÇÃO DE CORES (Para Importação e Simplificação) ---
-  function quantizeBuffer(buf, maxColors) {
-    // Coleta cores opacas
-    const samples = [];
-    for (let i = 0; i < buf.length; i += 4) {
-      if (buf[i+3] >= 128) samples.push([buf[i], buf[i+1], buf[i+2]]);
-    }
-    if (samples.length === 0) return;
-
-    // K-Means rápido para extrair a paleta dominante
-    const k = Math.min(maxColors, samples.length);
-    const palette = [];
-    const step = Math.max(1, Math.floor(samples.length / k));
-    for (let i = 0; i < k; i++) palette.push([...samples[i * step]]);
-
-    for (let iter = 0; iter < 5; iter++) {
-      const sums = Array.from({ length: k }, () => [0, 0, 0, 0]);
-      for (const p of samples) {
-        let best = 0, bestD = Infinity;
-        for (let c = 0; c < k; c++) {
-          const d = (p[0]-palette[c][0])**2 + (p[1]-palette[c][1])**2 + (p[2]-palette[c][2])**2;
-          if (d < bestD) { bestD = d; best = c; }
-        }
-        sums[best][0] += p[0]; sums[best][1] += p[1]; sums[best][2] += p[2]; sums[best][3]++;
-      }
-      for (let c = 0; c < k; c++) {
-        if (sums[c][3] > 0) {
-          palette[c] = [Math.round(sums[c][0]/sums[c][3]), Math.round(sums[c][1]/sums[c][3]), Math.round(sums[c][2]/sums[c][3])];
-        }
-      }
-    }
-
-    // Mapeia todos os pixels para a paleta reduzida
-    for (let i = 0; i < buf.length; i += 4) {
-      if (buf[i+3] < 128) {
-        buf[i+3] = 0;
-        continue;
-      }
-      let best = 0, bestD = Infinity;
-      for (let c = 0; c < k; c++) {
-        const d = (buf[i]-palette[c][0])**2 + (buf[i+1]-palette[c][1])**2 + (buf[i+2]-palette[c][2])**2;
-        if (d < bestD) { bestD = d; best = c; }
-      }
-      buf[i] = palette[best][0]; buf[i+1] = palette[best][1]; buf[i+2] = palette[best][2]; buf[i+3] = 255;
-    }
-  }
-
-  // --- MODAL IMPORTAR IMAGEM MANTENDO PROPORÇÃO ORIGINAL ---
-  const importModal = document.getElementById('importModal');
-  const impColors = document.getElementById('impColors');
-  const impWInput = document.getElementById('impW');
-  const impHInput = document.getElementById('impH');
-  const impMaxInput = document.getElementById('impMaxPixels');
-  let importedImageObj = null;
-  let importedAspectRatio = 1;
-
-  impColors.addEventListener('input', () => document.getElementById('impColorsLabel').textContent = `${impColors.value} cores`);
-
-  function clampDimensionsToLimit(w, h, maxPx) {
-    if (w * h > maxPx) {
-      const scale = Math.sqrt(maxPx / (w * h));
-      w = Math.max(4, Math.floor(w * scale));
-      h = Math.max(4, Math.floor(h * scale));
-    }
-    return [Math.max(4, Math.min(256, w)), Math.max(4, Math.min(256, h))];
-  }
-
-  document.getElementById('fileInput').addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const img = new Image();
-      img.onload = () => {
-        importedImageObj = img;
-        importedAspectRatio = img.naturalWidth / img.naturalHeight;
-        const maxPx = parseInt(impMaxInput.value) || 4096;
-        let baseW = parseInt(impWInput.value) || 32;
-        let baseH = Math.max(4, Math.round(baseW / importedAspectRatio));
-        [baseW, baseH] = clampDimensionsToLimit(baseW, baseH, maxPx);
-        impWInput.value = baseW;
-        impHInput.value = baseH;
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-
-  impWInput.addEventListener('input', () => {
-    if (!importedImageObj) return;
-    const maxPx = parseInt(impMaxInput.value) || 4096;
-    let w = Math.max(4, parseInt(impWInput.value) || 4);
-    let h = Math.max(4, Math.round(w / importedAspectRatio));
-    [w, h] = clampDimensionsToLimit(w, h, maxPx);
-    impHInput.value = h;
-  });
-
-  impHInput.addEventListener('input', () => {
-    if (!importedImageObj) return;
-    const maxPx = parseInt(impMaxInput.value) || 4096;
-    let h = Math.max(4, parseInt(impHInput.value) || 4);
-    let w = Math.max(4, Math.round(h * importedAspectRatio));
-    [w, h] = clampDimensionsToLimit(w, h, maxPx);
-    impWInput.value = w;
-  });
-
-  document.getElementById('btnOpenImport').addEventListener('click', () => importModal.classList.remove('hidden'));
-  document.getElementById('closeImportModal').addEventListener('click', () => importModal.classList.add('hidden'));
-
-  document.getElementById('confirmImportBtn').addEventListener('click', () => {
-    if (!importedImageObj) return alert('Selecione uma imagem primeiro.');
-
-    const maxPixels = parseInt(impMaxInput.value) || 4096;
-    const maxColors = parseInt(impColors.value) || 16;
-    let targetW = parseInt(impWInput.value) || 32;
-    let targetH = Math.max(4, Math.round(targetW / importedAspectRatio));
-    [targetW, targetH] = clampDimensionsToLimit(targetW, targetH, maxPixels);
-
-    commitSelection();
-    saveState();
     const off = document.createElement('canvas');
-    off.width = targetW; off.height = targetH;
-    const ctx = off.getContext('2d');
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(importedImageObj, 0, 0, targetW, targetH);
-    const raw = new Uint8Array(ctx.getImageData(0, 0, targetW, targetH).data);
-    quantizeBuffer(raw, maxColors);
-    if (document.getElementById('impRemoveBg').checked && raw[3] > 0) {
-      const bgR = raw[0], bgG = raw[1], bgB = raw[2];
-      for (let i = 0; i < raw.length; i += 4) {
-        if (Math.abs(raw[i] - bgR) <= 15 && Math.abs(raw[i+1] - bgG) <= 15 && Math.abs(raw[i+2] - bgB) <= 15) {
-          raw[i] = 0; raw[i+1] = 0; raw[i+2] = 0; raw[i+3] = 0;
-        }
-      }
-    }
+    off.width = state.gridW;
+    off.height = state.gridH;
+    const ctx = off.getContext('2d', { alpha: true });
+    ctx.putImageData(new ImageData(clean, state.gridW, state.gridH), 0, 0);
+    return off;
+  }
 
-    gridW = targetW; gridH = targetH;
-    frames = [{
-      id: 1,
-      activeLayerIdx: 0,
-      layers: [{ id: 1, name: 'Camada 1', visible: true, data: raw }]
-    }];
-    activeFrameIdx = 0;
-    syncActiveFrameRefs();
-    renderLayersUI();
-    renderFramesUI();
-    fitCanvas();
-    render();
-    updateStatus(0, 0);
-    importModal.classList.add('hidden');
-  });
-
-  // --- MODAL REDIMENSIONAR / AMPLIFICAR / SIMPLIFICAR ---
-  const resizeModal = document.getElementById('resizeModal');
-  const resMode = document.getElementById('resMode');
-  const resColors = document.getElementById('resColors');
-
-  resMode.addEventListener('change', () => {
-    document.getElementById('simplifyColorsWrap').classList.toggle('hidden', resMode.value !== 'simplify');
-    document.getElementById('simplifyColorsWrap').classList.toggle('flex', resMode.value === 'simplify');
-  });
-  resColors.addEventListener('input', () => document.getElementById('resColorsLabel').textContent = `${resColors.value} cores`);
-
-  document.getElementById('btnOpenResize').addEventListener('click', () => {
-    document.getElementById('resW').value = gridW;
-    document.getElementById('resH').value = gridH;
-    resizeModal.classList.remove('hidden');
-  });
-  document.getElementById('closeResizeModal').addEventListener('click', () => resizeModal.classList.add('hidden'));
-
-  document.getElementById('confirmResizeBtn').addEventListener('click', () => {
-    const newW = Math.max(4, Math.min(256, parseInt(document.getElementById('resW').value) || gridW));
-    const newH = Math.max(4, Math.min(256, parseInt(document.getElementById('resH').value) || gridH));
-    const mode = resMode.value;
-
+  function exportStaticImage(mimeType, ext) {
+    stopPlayback();
     commitSelection();
-    saveState();
+    const off = renderFrameToCanvas2D(state.activeFrameIdx);
+    off.toBlob(blob => downloadBlob(blob, `pixelbras-${state.gridW}x${state.gridH}.${ext}`), mimeType, 1.0);
+  }
 
-    const newBuf = new Uint8Array(newW * newH * 4);
+  document.getElementById('btnExport').addEventListener('click', () => exportStaticImage('image/png', 'png'));
+  document.getElementById('btnExportWebp').addEventListener('click', () => exportStaticImage('image/webp', 'webp'));
 
-    if (mode === 'amplify') {
-      // Nearest-neighbor puro: amplifica os pixels sem borrar
-      for (let y = 0; y < newH; y++) {
-        const srcY = Math.floor((y / newH) * gridH);
-        for (let x = 0; x < newW; x++) {
-          const srcX = Math.floor((x / newW) * gridW);
-          const sIdx = (srcY * gridW + srcX) * 4;
-          const dIdx = (y * newW + x) * 4;
-          newBuf[dIdx] = pixels[sIdx]; newBuf[dIdx+1] = pixels[sIdx+1];
-          newBuf[dIdx+2] = pixels[sIdx+2]; newBuf[dIdx+3] = pixels[sIdx+3];
+  // GIF Animado LZW
+  function encodeAnimatedGIF(w, h, rgbaFrames, fpsVal) {
+    const out = [];
+    const writeBytes = arr => { for (let i = 0; i < arr.length; i++) out.push(arr[i]); };
+    const writeStr = s => { for (let i = 0; i < s.length; i++) out.push(s.charCodeAt(i)); };
+    const writeU16 = v => { out.push(v & 0xff, (v >> 8) & 0xff); };
+
+    const palette = new Uint8Array(256 * 3);
+    const colorMap = new Map();
+    let palCount = 0;
+
+    for (const buf of rgbaFrames) {
+      for (let i = 0; i < buf.length; i += 4) {
+        if (buf[i + 3] < 128) continue;
+        const key = ((buf[i] >> 1) << 14) | ((buf[i + 1] >> 1) << 7) | (buf[i + 2] >> 1);
+        if (!colorMap.has(key) && palCount < 255) {
+          colorMap.set(key, palCount);
+          palette[palCount * 3] = buf[i];
+          palette[palCount * 3 + 1] = buf[i + 1];
+          palette[palCount * 3 + 2] = buf[i + 2];
+          palCount++;
         }
       }
-    } else {
-      // Usa canvas auxiliar para reamostragem e depois quantiza/limpa
-      const srcCanvas = document.createElement('canvas');
-      srcCanvas.width = gridW; srcCanvas.height = gridH;
-      srcCanvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(pixels), gridW, gridH), 0, 0);
-
-      const dstCanvas = document.createElement('canvas');
-      dstCanvas.width = newW; dstCanvas.height = newH;
-      const dCtx = dstCanvas.getContext('2d');
-      dCtx.imageSmoothingEnabled = (mode === 'smooth');
-      dCtx.drawImage(srcCanvas, 0, 0, newW, newH);
-
-      const resData = new Uint8Array(dCtx.getImageData(0, 0, newW, newH).data);
-      if (mode === 'simplify') {
-        quantizeBuffer(resData, parseInt(resColors.value) || 8);
-      } else {
-        // Limpa semi-transparências para manter estética pixel art
-        for (let i = 0; i < resData.length; i += 4) resData[i+3] = resData[i+3] >= 128 ? 255 : 0;
-      }
-      newBuf.set(resData);
     }
 
-    gridW = newW; gridH = newH;
-    frames.forEach((fr, fIdx) => {
-      fr.layers.forEach((l, lIdx) => {
-        if (fIdx === activeFrameIdx && lIdx === activeLayerIdx) {
-          l.data = newBuf;
-        } else {
-          l.data = new Uint8Array(newW * newH * 4);
+    function nearestColorIdx(r, g, b) {
+      const key = ((r >> 1) << 14) | ((g >> 1) << 7) | (b >> 1);
+      if (colorMap.has(key)) return colorMap.get(key);
+      let best = 0, bestD = Infinity;
+      for (let i = 0; i < palCount; i++) {
+        const dr = r - palette[i * 3], dg = g - palette[i * 3 + 1], db = b - palette[i * 3 + 2];
+        const d = dr * dr + dg * dg + db * db;
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      return best;
+    }
+
+    writeStr('GIF89a');
+    writeU16(w); writeU16(h);
+    out.push(0xf7, 255, 0);
+    writeBytes(palette);
+
+    out.push(0x21, 0xff, 0x0b);
+    writeStr('NETSCAPE2.0');
+    out.push(0x03, 0x01, 0x00, 0x00, 0x00);
+
+    const delayCs = Math.max(2, Math.round(100 / fpsVal));
+
+    function lzwEncode(indices) {
+      const minCodeSize = 8, clearCode = 256, eoiCode = 257;
+      const lzwOut = [minCodeSize];
+      let subBlock = [], bitBuf = 0, bitCount = 0;
+      function emitCode(code, size) {
+        bitBuf |= (code << bitCount);
+        bitCount += size;
+        while (bitCount >= 8) {
+          subBlock.push(bitBuf & 0xff);
+          if (subBlock.length === 255) { lzwOut.push(255, ...subBlock); subBlock = []; }
+          bitBuf >>= 8; bitCount -= 8;
         }
+      }
+      let codeSize = 9, nextCode = 258, dict = new Map();
+      emitCode(clearCode, codeSize);
+      let prefix = indices[0];
+      for (let i = 1; i < indices.length; i++) {
+        const k = indices[i];
+        const pair = (prefix << 8) | k;
+        if (dict.has(pair)) {
+          prefix = dict.get(pair);
+        } else {
+          emitCode(prefix, codeSize);
+          if (nextCode < 4096) {
+            dict.set(pair, nextCode++);
+            if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++;
+          } else {
+            emitCode(clearCode, codeSize);
+            dict.clear(); codeSize = 9; nextCode = 258;
+          }
+          prefix = k;
+        }
+      }
+      emitCode(prefix, codeSize);
+      emitCode(eoiCode, codeSize);
+      if (bitCount > 0) subBlock.push(bitBuf & 0xff);
+      if (subBlock.length > 0) lzwOut.push(subBlock.length, ...subBlock);
+      lzwOut.push(0x00);
+      return lzwOut;
+    }
+
+    for (const buf of rgbaFrames) {
+      out.push(0x21, 0xf9, 0x04, 0x09);
+      writeU16(delayCs);
+      out.push(255, 0x00);
+      out.push(0x2c);
+      writeU16(0); writeU16(0); writeU16(w); writeU16(h);
+      out.push(0x00);
+
+      const indices = new Uint8Array(w * h);
+      for (let p = 0, idx = 0; p < buf.length; p += 4, idx++) {
+        indices[idx] = buf[p + 3] < 128 ? 255 : nearestColorIdx(buf[p], buf[p + 1], buf[p + 2]);
+      }
+      writeBytes(lzwEncode(indices));
+    }
+
+    out.push(0x3b);
+    return new Blob([new Uint8Array(out)], { type: 'image/gif' });
+  }
+
+  // WebP Animado RIFF
+  async function encodeAnimatedWebP(w, h, fpsVal) {
+    const delayMs = Math.max(10, Math.round(1000 / fpsVal));
+    const framePayloads = [];
+
+    for (let idx = 0; idx < state.frames.length; idx++) {
+      const c = renderFrameToCanvas2D(idx);
+      const blob = await new Promise(res => c.toBlob(res, 'image/webp', 1.0));
+      const ab = new Uint8Array(await blob.arrayBuffer());
+      let pos = 12;
+      const chunks = [];
+      while (pos + 8 <= ab.length) {
+        const tag = String.fromCharCode(ab[pos], ab[pos+1], ab[pos+2], ab[pos+3]);
+        const len = ab[pos+4] | (ab[pos+5] << 8) | (ab[pos+6] << 16) | (ab[pos+7] << 24);
+        const paddedLen = len + (len & 1);
+        if (tag === 'VP8 ' || tag === 'VP8L' || tag === 'ALPH') {
+          chunks.push(ab.subarray(pos, pos + 8 + paddedLen));
+        }
+        pos += 8 + paddedLen;
+      }
+      const merged = new Uint8Array(chunks.reduce((s, ch) => s + ch.length, 0));
+      let off = 0;
+      for (const ch of chunks) { merged.set(ch, off); off += ch.length; }
+      framePayloads.push(merged);
+    }
+
+    function u32le(v) { return [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff]; }
+    function u24le(v) { return [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff]; }
+    function strBytes(s) { return [...s].map(c => c.charCodeAt(0)); }
+
+    const vp8x = new Uint8Array([...strBytes('VP8X'), ...u32le(10), 0x12, 0x00, 0x00, 0x00, ...u24le(w - 1), ...u24le(h - 1)]);
+    const anim = new Uint8Array([...strBytes('ANIM'), ...u32le(6), 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+
+    const anmfChunks = framePayloads.map(payload => {
+      const chunkLen = 16 + payload.length;
+      const header = new Uint8Array([
+        ...strBytes('ANMF'), ...u32le(chunkLen),
+        ...u24le(0), ...u24le(0), ...u24le(w - 1), ...u24le(h - 1),
+        ...u24le(delayMs), 0x03
+      ]);
+      const full = new Uint8Array(8 + chunkLen + (chunkLen & 1));
+      full.set(header, 0);
+      full.set(payload, 24);
+      return full;
+    });
+
+    const bodyLen = vp8x.length + anim.length + anmfChunks.reduce((s, c) => s + c.length, 0);
+    const riff = new Uint8Array(12 + bodyLen);
+    riff.set([...strBytes('RIFF'), ...u32le(4 + bodyLen), ...strBytes('WEBP')], 0);
+    let ptr = 12;
+    riff.set(vp8x, ptr); ptr += vp8x.length;
+    riff.set(anim, ptr); ptr += anim.length;
+    for (const c of anmfChunks) { riff.set(c, ptr); ptr += c.length; }
+
+    return new Blob([riff], { type: 'image/webp' });
+  }
+
+  document.getElementById('btnExportGif').addEventListener('click', () => {
+    stopPlayback();
+    commitSelection();
+    const allComps = state.frames.map((_, idx) => getCompositeBuffer(null, idx));
+    downloadBlob(encodeAnimatedGIF(state.gridW, state.gridH, allComps, state.fps), `pixelbras-anim-${state.gridW}x${state.gridH}.gif`);
+  });
+
+  document.getElementById('btnExportAnimWebp').addEventListener('click', async () => {
+    stopPlayback();
+    commitSelection();
+    const blob = await encodeAnimatedWebP(state.gridW, state.gridH, state.fps);
+    downloadBlob(blob, `pixelbras-anim-${state.gridW}x${state.gridH}.webp`);
+  });
+
+  // =========================================================================
+  // 9. UI DE CAMADAS E TIMELINE DE ANIMAÇÃO (SINCRONIZADAS COM STATE)
+  // =========================================================================
+  const layersPanel = document.getElementById('layersPanel');
+  const layersList = document.getElementById('layersList');
+
+  function renderLayersUI() {
+    const fr = getActiveFrame();
+    document.getElementById('layerFrameNum').textContent = `${state.activeFrameIdx + 1}`;
+    layersList.innerHTML = '';
+
+    for (let i = fr.layers.length - 1; i >= 0; i--) {
+      const l = fr.layers[i];
+      const isActive = i === fr.activeLayerIdx;
+      const row = document.createElement('div');
+      row.className = `flex items-center justify-between p-1.5 rounded-lg border cursor-pointer ${isActive ? 'bg-purple-950/60 border-purple-500 text-white' : 'bg-zinc-800/80 border-zinc-700 text-zinc-400'}`;
+      row.innerHTML = `
+        <div class="flex items-center gap-1.5 truncate flex-1" data-select="${i}">
+          <button class="text-xs px-1 hover:text-white" data-vis="${i}" title="Mostrar/Ocultar">${l.visible ? '👁️' : '🚫'}</button>
+          <span class="truncate font-medium">${l.name}</span>
+        </div>
+        ${fr.layers.length > 1 ? `<button class="text-red-400 hover:text-red-300 px-1.5 font-bold" data-del="${i}" title="Excluir Camada">&times;</button>` : ''}
+      `;
+      layersList.appendChild(row);
+    }
+
+    layersList.querySelectorAll('[data-select]').forEach(el => {
+      el.addEventListener('click', () => {
+        commitSelection();
+        fr.activeLayerIdx = parseInt(el.dataset.select, 10);
+        renderLayersUI();
+        updateStatus(lastX, lastY);
       });
     });
-    pixels = newBuf; renderLayersUI(); renderFramesUI();
-    fitCanvas();
-    render();
-    updateStatus(0, 0);
-    resizeModal.classList.add('hidden');
-  });
 
-  // --- BOTÕES INFERIORES & ATALHOS ---
-  document.getElementById('btnUndo').addEventListener('click', undo);
-  document.getElementById('btnRedo').addEventListener('click', redo);
-  document.getElementById('btnGrid').addEventListener('click', e => {
-    showGrid = !showGrid;
-    e.currentTarget.classList.toggle('active', showGrid);
-    render();
+    layersList.querySelectorAll('[data-vis]').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        const idx = parseInt(el.dataset.vis, 10);
+        fr.layers[idx].visible = !fr.layers[idx].visible;
+        renderLayersUI();
+        render();
+      });
+    });
+
+    layersList.querySelectorAll('[data-del]').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        if (fr.layers.length <= 1) return;
+        commitSelection();
+        saveState();
+        const idx = parseInt(el.dataset.del, 10);
+        fr.layers.splice(idx, 1);
+        fr.activeLayerIdx = Math.max(0, Math.min(fr.activeLayerIdx, fr.layers.length - 1));
+        refreshAllUI();
+      });
+    });
+  }
+
+  document.getElementById('btnToggleLayers').addEventListener('click', () => {
+    renderLayersUI();
+    layersPanel.classList.toggle('hidden');
   });
-  document.getElementById('btnClear').addEventListener('click', () => {
+  document.getElementById('btnCloseLayers').addEventListener('click', () => layersPanel.classList.add('hidden'));
+
+  document.getElementById('btnAddLayer').addEventListener('click', () => {
     commitSelection();
     saveState();
-    pixels.fill(0);
+    const fr = getActiveFrame();
+    state.layerCounter++;
+    fr.layers.push({
+      id: state.layerCounter,
+      name: `Camada ${fr.layers.length + 1}`,
+      visible: true,
+      data: new Uint8Array(state.gridW * state.gridH * 4)
+    });
+    fr.activeLayerIdx = fr.layers.length - 1;
+    refreshAllUI();
+  });
+
+  // Timeline de Quadros
+  const animPanel = document.getElementById('animPanel');
+  const framesList = document.getElementById('framesList');
+  let playTimer = null;
+
+  function stopPlayback() {
+    if (!state.isPlaying) return;
+    state.isPlaying = false;
+    clearInterval(playTimer);
+    playTimer = null;
+    document.getElementById('playIcon').textContent = '▶ Play';
+    refreshAllUI();
+  }
+
+  function renderFramesUI() {
+    framesList.innerHTML = '';
+    state.frames.forEach((fr, idx) => {
+      const isSelected = idx === state.activeFrameIdx;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `relative flex flex-col items-center p-1 rounded-lg border shrink-0 transition ${isSelected ? 'border-orange-500 bg-orange-950/40' : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'}`;
+
+      const thumb = renderFrameToCanvas2D(idx);
+      thumb.className = 'w-11 h-11 rounded bg-zinc-950 border border-zinc-800';
+
+      const badge = document.createElement('span');
+      badge.className = `text-[10px] font-mono mt-0.5 ${isSelected ? 'text-orange-400 font-bold' : 'text-zinc-400'}`;
+      badge.textContent = `#${idx + 1}`;
+
+      card.appendChild(thumb);
+      card.appendChild(badge);
+      card.addEventListener('click', () => {
+        stopPlayback();
+        commitSelection();
+        state.activeFrameIdx = idx;
+        refreshAllUI();
+      });
+      framesList.appendChild(card);
+    });
+  }
+
+  function refreshAllUI() {
+    renderLayersUI();
+    renderFramesUI();
+    render();
+    updateStatus(lastX, lastY);
+  }
+
+  document.getElementById('btnToggleAnim').addEventListener('click', () => {
+    animPanel.classList.toggle('hidden');
+    renderFramesUI();
+    fitCanvas();
+  });
+
+  document.getElementById('btnAddFrame').addEventListener('click', () => {
+    stopPlayback();
+    commitSelection();
+    saveState();
+    state.frameCounter++;
+    const newFrame = {
+      id: state.frameCounter,
+      activeLayerIdx: 0,
+      layers: [{ id: 1, name: 'Camada 1', visible: true, data: new Uint8Array(state.gridW * state.gridH * 4) }]
+    };
+    state.frames.splice(state.activeFrameIdx + 1, 0, newFrame);
+    state.activeFrameIdx++;
+    refreshAllUI();
+  });
+
+  document.getElementById('btnDupFrame').addEventListener('click', () => {
+    stopPlayback();
+    commitSelection();
+    saveState();
+    const curFr = getActiveFrame();
+    state.frameCounter++;
+    const dupFrame = {
+      id: state.frameCounter,
+      activeLayerIdx: curFr.activeLayerIdx,
+      layers: curFr.layers.map(l => ({ id: l.id, name: l.name, visible: l.visible, data: new Uint8Array(l.data) }))
+    };
+    state.frames.splice(state.activeFrameIdx + 1, 0, dupFrame);
+    state.activeFrameIdx++;
+    refreshAllUI();
+  });
+
+  document.getElementById('btnDelFrame').addEventListener('click', () => {
+    if (state.frames.length <= 1) return alert('A animação precisa ter pelo menos 1 quadro.');
+    stopPlayback();
+    commitSelection();
+    saveState();
+    state.frames.splice(state.activeFrameIdx, 1);
+    state.activeFrameIdx = Math.max(0, state.activeFrameIdx - 1);
+    refreshAllUI();
+  });
+
+  document.getElementById('btnOnionSkin').addEventListener('click', e => {
+    state.onionSkin = !state.onionSkin;
+    e.currentTarget.classList.toggle('border-orange-500', state.onionSkin);
+    e.currentTarget.classList.toggle('text-orange-400', state.onionSkin);
     render();
   });
 
-  window.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
-    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
-    else if (e.key === 'Enter' && selection) { commitSelection(); }
-    else if ((e.key === 'Delete' || e.key === 'Backspace') && selection) { selection = null; updateSelectionBar(); render(); }
-    else if (!e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
-      const k = e.key.toLowerCase();
-      if (k === 'b') selectTool('brush');
-      if (k === 'g') selectTool('bucket');
-      if (k === 'i') selectTool('picker');
-      if (k === 'l') selectTool('line');
-      if (k === 'r') selectTool('rect');
-      if (k === 'm') selectTool('select');
-      if (k === 'e') selectTool('eraser');
+  document.getElementById('fpsInput').addEventListener('change', e => {
+    state.fps = Math.max(1, Math.min(30, parseInt(e.target.value, 10) || 8));
+    e.target.value = state.fps;
+    if (state.isPlaying) {
+      stopPlayback();
+      document.getElementById('btnPlayAnim').click();
     }
   });
 
-  // --- PAINEL DO PINCEL: SLIDER, FORMATOS E CRIADOR ARBITRÁRIO 7x7 ---
+  document.getElementById('btnPlayAnim').addEventListener('click', () => {
+    if (state.isPlaying) {
+      stopPlayback();
+      return;
+    }
+    if (state.frames.length <= 1) return;
+    commitSelection();
+    state.isPlaying = true;
+    document.getElementById('playIcon').textContent = '⏸ Pause';
+    playTimer = setInterval(() => {
+      state.activeFrameIdx = (state.activeFrameIdx + 1) % state.frames.length;
+      render();
+    }, Math.round(1000 / state.fps));
+  });
+
+  // =========================================================================
+  // 10. PAINEL DE PINCÉIS, RODA DE CORES, IMPORTAÇÃO, REDIMENSIONAMENTO E ZOOM
+  // =========================================================================
+  let savedCustomBrushes = JSON.parse(localStorage.getItem('pixelbras_custom_brushes') || '[]');
   const brushSizeSlider = document.getElementById('brushSizeSlider');
   const brushSizeVal = document.getElementById('brushSizeVal');
   const brushBadge = document.getElementById('brushBadge');
 
   function updateBrushSize(val) {
-    brushSize = parseInt(val, 10) || 1;
-    brushSizeSlider.value = brushSize;
-    brushSizeVal.textContent = `${brushSize}px`;
-    brushBadge.textContent = `${brushSize}px`;
+    state.brushSize = parseInt(val, 10) || 1;
+    brushSizeSlider.value = state.brushSize;
+    brushSizeVal.textContent = `${state.brushSize}px`;
+    brushBadge.textContent = `${state.brushSize}px`;
   }
 
   brushSizeSlider.addEventListener('input', e => updateBrushSize(e.target.value));
@@ -1509,7 +1588,7 @@
 
   function updateShapeButtonsUI() {
     document.querySelectorAll('.shape-opt').forEach(btn => {
-      const active = (brushShape === btn.dataset.shape);
+      const active = (state.brushShape === btn.dataset.shape);
       btn.classList.toggle('border-emerald-500', active);
       btn.classList.toggle('text-emerald-400', active);
       btn.classList.toggle('border-zinc-700', !active);
@@ -1520,17 +1599,16 @@
 
   document.querySelectorAll('.shape-opt').forEach(btn => {
     btn.addEventListener('click', () => {
-      brushShape = btn.dataset.shape;
-      activeCustomMatrix = null;
-      if (brushShape !== 'square' && brushSize < 3) updateBrushSize(3);
+      state.brushShape = btn.dataset.shape;
+      state.activeCustomMatrix = null;
+      if (state.brushShape !== 'square' && state.brushSize < 3) updateBrushSize(3);
       updateShapeButtonsUI();
     });
   });
 
-  // Grade interativa 7x7 para criar formato arbitrário
   const customBrushGrid = document.getElementById('customBrushGrid');
   let draftMatrix = new Array(49).fill(0);
-  draftMatrix[24] = 1; // Centro marcado inicialmente
+  draftMatrix[24] = 1;
 
   function renderDraftGrid() {
     customBrushGrid.innerHTML = '';
@@ -1560,22 +1638,22 @@
     list.innerHTML = '';
 
     savedCustomBrushes.forEach((b, idx) => {
-      const isSelected = (brushShape === 'custom' && activeCustomMatrix === b.matrix);
+      const isSelected = (state.brushShape === 'custom' && state.activeCustomMatrix === b.matrix);
       const item = document.createElement('div');
       item.className = `flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold cursor-pointer ${isSelected ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300' : 'bg-zinc-800 border-zinc-700 text-zinc-300'}`;
       item.innerHTML = `<span>${b.name}</span><button type="button" class="text-red-400 hover:text-red-300 ml-1 font-bold" title="Remover">&times;</button>`;
 
-      item.addEventListener('click', (e) => {
+      item.addEventListener('click', e => {
         if (e.target.tagName === 'BUTTON') {
           savedCustomBrushes.splice(idx, 1);
           localStorage.setItem('pixelbras_custom_brushes', JSON.stringify(savedCustomBrushes));
-          if (isSelected) { brushShape = 'square'; activeCustomMatrix = null; }
+          if (isSelected) { state.brushShape = 'square'; state.activeCustomMatrix = null; }
           updateShapeButtonsUI();
           return;
         }
-        brushShape = 'custom';
-        activeCustomMatrix = b.matrix;
-        if (brushSize < 3) updateBrushSize(3);
+        state.brushShape = 'custom';
+        state.activeCustomMatrix = b.matrix;
+        if (state.brushSize < 3) updateBrushSize(3);
         updateShapeButtonsUI();
       });
       list.appendChild(item);
@@ -1591,100 +1669,344 @@
     savedCustomBrushes.push({ name, matrix: matrixCopy });
     localStorage.setItem('pixelbras_custom_brushes', JSON.stringify(savedCustomBrushes));
 
-    brushShape = 'custom';
-    activeCustomMatrix = matrixCopy;
-    if (brushSize < 3) updateBrushSize(3);
+    state.brushShape = 'custom';
+    state.activeCustomMatrix = matrixCopy;
+    if (state.brushSize < 3) updateBrushSize(3);
     nameInput.value = '';
     updateShapeButtonsUI();
   });
 
-  // --- GERENCIADOR DE CAMADAS ---
-  const layersPanel = document.getElementById('layersPanel');
-  const layersList = document.getElementById('layersList');
+  // Roda de Cores HSV
+  const colorModal = document.getElementById('colorModal');
+  const wheelCanvas = document.getElementById('wheelCanvas');
+  const wheelCtx = wheelCanvas.getContext('2d');
+  const valSlider = document.getElementById('valSlider');
+  const hexInput = document.getElementById('hexInput');
+  let wheelH = 147, wheelS = 0.98, wheelV = 0.83;
 
-  function renderLayersUI() {
-    layersList.innerHTML = '';
-    for (let i = layers.length - 1; i >= 0; i--) {
-      const l = layers[i];
-      const isActive = i === activeLayerIdx;
-      const row = document.createElement('div');
-      row.className = `flex items-center justify-between p-1.5 rounded-lg border cursor-pointer ${isActive ? 'bg-purple-950/60 border-purple-500 text-white' : 'bg-zinc-800/80 border-zinc-700 text-zinc-400'}`;
-      row.innerHTML = `
-        <div class="flex items-center gap-1.5 truncate flex-1" data-select="${i}">
-          <button class="text-xs px-1 hover:text-white" data-vis="${i}" title="Mostrar/Ocultar">${l.visible ? '👁️' : '🚫'}</button>
-          <span class="truncate font-medium">${l.name}</span>
-        </div>
-        ${layers.length > 1 ? `<button class="text-red-400 hover:text-red-300 px-1.5 font-bold" data-del="${i}" title="Excluir Camada">&times;</button>` : ''}
-      `;
-      layersList.appendChild(row);
+  function hsvToRgb(h, s, v) {
+    let f = (n, k = (n + h / 60) % 6) => v - v * s * Math.max(Math.min(k, 4 - k, 1), 0);
+    return [Math.round(f(5) * 255), Math.round(f(3) * 255), Math.round(f(1) * 255)];
+  }
+  function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+  }
+  function drawColorWheel() {
+    const r = wheelCanvas.width / 2;
+    const img = wheelCtx.createImageData(wheelCanvas.width, wheelCanvas.height);
+    for (let y = 0; y < wheelCanvas.height; y++) {
+      for (let x = 0; x < wheelCanvas.width; x++) {
+        const dx = x - r, dy = y - r;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const idx = (y * wheelCanvas.width + x) * 4;
+        if (dist <= r) {
+          const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+          const sat = dist / r;
+          const [cr, cg, cb] = hsvToRgb(angle, sat, wheelV);
+          img.data[idx] = cr; img.data[idx+1] = cg; img.data[idx+2] = cb; img.data[idx+3] = 255;
+        } else {
+          img.data[idx+3] = 0;
+        }
+      }
+    }
+    wheelCtx.putImageData(img, 0, 0);
+    const rad = wheelH * Math.PI / 180;
+    const mx = r + Math.cos(rad) * (wheelS * r);
+    const my = r + Math.sin(rad) * (wheelS * r);
+    wheelCtx.beginPath();
+    wheelCtx.arc(mx, my, 7, 0, Math.PI * 2);
+    wheelCtx.lineWidth = 2.5;
+    wheelCtx.strokeStyle = wheelV > 0.5 ? '#000' : '#fff';
+    wheelCtx.stroke();
+  }
+  function updateWheelPreview() {
+    const [r, g, b] = hsvToRgb(wheelH, wheelS, wheelV);
+    const hex = rgbToHex(r, g, b);
+    document.getElementById('wheelPreview').style.backgroundColor = hex;
+    hexInput.value = hex;
+  }
+  function syncColorUI() {
+    const hex = rgbToHex(state.currentColor[0], state.currentColor[1], state.currentColor[2]);
+    document.getElementById('currentColorSwatch').style.backgroundColor = hex;
+    document.getElementById('wheelPreview').style.backgroundColor = hex;
+    hexInput.value = hex;
+  }
+  function pickFromWheel(clientX, clientY) {
+    const rect = wheelCanvas.getBoundingClientRect();
+    const r = wheelCanvas.width / 2;
+    const x = ((clientX - rect.left) / rect.width) * wheelCanvas.width - r;
+    const y = ((clientY - rect.top) / rect.height) * wheelCanvas.height - r;
+    const dist = Math.min(r, Math.sqrt(x * x + y * y));
+    wheelH = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    wheelS = dist / r;
+    drawColorWheel();
+    updateWheelPreview();
+  }
+
+  let wheelDragging = false;
+  wheelCanvas.addEventListener('touchstart', e => { e.preventDefault(); wheelDragging = true; pickFromWheel(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  wheelCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (wheelDragging) pickFromWheel(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  wheelCanvas.addEventListener('touchend', () => wheelDragging = false);
+  wheelCanvas.addEventListener('mousedown', e => { wheelDragging = true; pickFromWheel(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', e => { if (wheelDragging) pickFromWheel(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', () => wheelDragging = false);
+
+  valSlider.addEventListener('input', () => {
+    wheelV = valSlider.value / 100;
+    document.getElementById('valLabel').textContent = `${valSlider.value}%`;
+    drawColorWheel();
+    updateWheelPreview();
+  });
+  document.getElementById('btnColorWheel').addEventListener('click', () => { drawColorWheel(); colorModal.classList.remove('hidden'); });
+  document.getElementById('closeColorModal').addEventListener('click', () => colorModal.classList.add('hidden'));
+  document.getElementById('confirmColorBtn').addEventListener('click', () => {
+    const hex = hexInput.value;
+    if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+      state.currentColor = [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16), 255];
+      syncColorUI();
+    }
+    colorModal.classList.add('hidden');
+  });
+
+  // Quantização de Cores
+  function quantizeBuffer(buf, maxColors) {
+    const samples = [];
+    for (let i = 0; i < buf.length; i += 4) {
+      if (buf[i+3] >= 128) samples.push([buf[i], buf[i+1], buf[i+2]]);
+    }
+    if (samples.length === 0) return;
+
+    const k = Math.min(maxColors, samples.length);
+    const palette = [];
+    const step = Math.max(1, Math.floor(samples.length / k));
+    for (let i = 0; i < k; i++) palette.push([...samples[i * step]]);
+
+    for (let iter = 0; iter < 5; iter++) {
+      const sums = Array.from({ length: k }, () => [0, 0, 0, 0]);
+      for (const p of samples) {
+        let best = 0, bestD = Infinity;
+        for (let c = 0; c < k; c++) {
+          const d = (p[0]-palette[c][0])**2 + (p[1]-palette[c][1])**2 + (p[2]-palette[c][2])**2;
+          if (d < bestD) { bestD = d; best = c; }
+        }
+        sums[best][0] += p[0]; sums[best][1] += p[1]; sums[best][2] += p[2]; sums[best][3]++;
+      }
+      for (let c = 0; c < k; c++) {
+        if (sums[c][3] > 0) {
+          palette[c] = [Math.round(sums[c][0]/sums[c][3]), Math.round(sums[c][1]/sums[c][3]), Math.round(sums[c][2]/sums[c][3])];
+        }
+      }
     }
 
-    layersList.querySelectorAll('[data-select]').forEach(el => {
-      el.addEventListener('click', () => {
-        commitSelection();
-        activeLayerIdx = parseInt(el.dataset.select);
-        pixels = layers[activeLayerIdx].data;
-        renderLayersUI();
-      });
-    });
-
-    layersList.querySelectorAll('[data-vis]').forEach(el => {
-      el.addEventListener('click', e => {
-        e.stopPropagation();
-        const idx = parseInt(el.dataset.vis);
-        layers[idx].visible = !layers[idx].visible;
-        renderLayersUI();
-        render();
-      });
-    });
-
-    layersList.querySelectorAll('[data-del]').forEach(el => {
-      el.addEventListener('click', e => {
-        e.stopPropagation();
-        if (layers.length <= 1) return;
-        commitSelection();
-        saveState();
-        const idx = parseInt(el.dataset.del);
-        layers.splice(idx, 1);
-        activeLayerIdx = Math.min(activeLayerIdx, layers.length - 1);
-        pixels = layers[activeLayerIdx].data;
-        renderLayersUI();
-        render();
-      });
-    });
+    for (let i = 0; i < buf.length; i += 4) {
+      if (buf[i+3] < 128) {
+        buf[i] = 0; buf[i+1] = 0; buf[i+2] = 0; buf[i+3] = 0;
+        continue;
+      }
+      let best = 0, bestD = Infinity;
+      for (let c = 0; c < k; c++) {
+        const d = (buf[i]-palette[c][0])**2 + (buf[i+1]-palette[c][1])**2 + (buf[i+2]-palette[c][2])**2;
+        if (d < bestD) { bestD = d; best = c; }
+      }
+      buf[i] = palette[best][0]; buf[i+1] = palette[best][1]; buf[i+2] = palette[best][2]; buf[i+3] = 255;
+    }
   }
 
-  document.getElementById('btnToggleLayers').addEventListener('click', () => {
-    renderLayersUI();
-    layersPanel.classList.toggle('hidden');
-  });
-  document.getElementById('btnCloseLayers').addEventListener('click', () => layersPanel.classList.add('hidden'));
+  // Importação mantendo proporção original
+  const importModal = document.getElementById('importModal');
+  const impColors = document.getElementById('impColors');
+  const impWInput = document.getElementById('impW');
+  const impHInput = document.getElementById('impH');
+  const impMaxInput = document.getElementById('impMaxPixels');
+  let importedImageObj = null;
+  let importedAspectRatio = 1;
 
-  document.getElementById('btnAddLayer').addEventListener('click', () => {
+  impColors.addEventListener('input', () => document.getElementById('impColorsLabel').textContent = `${impColors.value} cores`);
+
+  function clampDimensionsToLimit(w, h, maxPx) {
+    if (w * h > maxPx) {
+      const scale = Math.sqrt(maxPx / (w * h));
+      w = Math.max(4, Math.floor(w * scale));
+      h = Math.max(4, Math.floor(h * scale));
+    }
+    return [Math.max(4, Math.min(256, w)), Math.max(4, Math.min(256, h))];
+  }
+
+  document.getElementById('fileInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        importedImageObj = img;
+        importedAspectRatio = img.naturalWidth / img.naturalHeight;
+        const maxPx = parseInt(impMaxInput.value, 10) || 4096;
+        let baseW = parseInt(impWInput.value, 10) || 32;
+        let baseH = Math.max(4, Math.round(baseW / importedAspectRatio));
+        [baseW, baseH] = clampDimensionsToLimit(baseW, baseH, maxPx);
+        impWInput.value = baseW;
+        impHInput.value = baseH;
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  impWInput.addEventListener('input', () => {
+    if (!importedImageObj) return;
+    const maxPx = parseInt(impMaxInput.value, 10) || 4096;
+    let w = Math.max(4, parseInt(impWInput.value, 10) || 4);
+    let h = Math.max(4, Math.round(w / importedAspectRatio));
+    [w, h] = clampDimensionsToLimit(w, h, maxPx);
+    impHInput.value = h;
+  });
+
+  impHInput.addEventListener('input', () => {
+    if (!importedImageObj) return;
+    const maxPx = parseInt(impMaxInput.value, 10) || 4096;
+    let h = Math.max(4, parseInt(impHInput.value, 10) || 4);
+    let w = Math.max(4, Math.round(h * importedAspectRatio));
+    [w, h] = clampDimensionsToLimit(w, h, maxPx);
+    impWInput.value = w;
+  });
+
+  document.getElementById('btnOpenImport').addEventListener('click', () => importModal.classList.remove('hidden'));
+  document.getElementById('closeImportModal').addEventListener('click', () => importModal.classList.add('hidden'));
+
+  document.getElementById('confirmImportBtn').addEventListener('click', () => {
+    if (!importedImageObj) return alert('Selecione uma imagem primeiro.');
+    stopPlayback();
     commitSelection();
     saveState();
-    layerCounter++;
-    layers.push({ id: layerCounter, name: `Camada ${layerCounter}`, visible: true, data: new Uint8Array(gridW * gridH * 4) });
-    activeLayerIdx = layers.length - 1;
-    pixels = layers[activeLayerIdx].data;
-    renderLayersUI();
-    render();
+
+    const maxPixels = parseInt(impMaxInput.value, 10) || 4096;
+    const maxColors = parseInt(impColors.value, 10) || 16;
+    let targetW = parseInt(impWInput.value, 10) || 32;
+    let targetH = Math.max(4, Math.round(targetW / importedAspectRatio));
+    [targetW, targetH] = clampDimensionsToLimit(targetW, targetH, maxPixels);
+
+    const off = document.createElement('canvas');
+    off.width = targetW; off.height = targetH;
+    const ctx = off.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(importedImageObj, 0, 0, targetW, targetH);
+    const raw = new Uint8Array(ctx.getImageData(0, 0, targetW, targetH).data);
+    quantizeBuffer(raw, maxColors);
+
+    if (document.getElementById('impRemoveBg').checked && raw[3] > 0) {
+      const bgR = raw[0], bgG = raw[1], bgB = raw[2];
+      for (let i = 0; i < raw.length; i += 4) {
+        if (Math.abs(raw[i] - bgR) <= 15 && Math.abs(raw[i+1] - bgG) <= 15 && Math.abs(raw[i+2] - bgB) <= 15) {
+          raw[i] = 0; raw[i+1] = 0; raw[i+2] = 0; raw[i+3] = 0;
+        }
+      }
+    }
+
+    state.gridW = targetW;
+    state.gridH = targetH;
+    state.frames = [{
+      id: 1,
+      activeLayerIdx: 0,
+      layers: [{ id: 1, name: 'Camada 1', visible: true, data: raw }]
+    }];
+    state.activeFrameIdx = 0;
+    fitCanvas();
+    refreshAllUI();
+    importModal.classList.add('hidden');
   });
 
-  // --- ZOOM (BOTÕES, SCROLL DO MOUSE E PINÇA COM 2 DEDOS NO MOBILE) ---
-  function setZoom(newZoom) {
-    zoomLevel = Math.max(0.5, Math.min(8, newZoom));
-    if (zoomLevel === 1) { panX = 0; panY = 0; }
-    applyTransform();
+  // Redimensionamento / Amplificar / Simplificar (preservando todas as camadas e quadros)
+  const resizeModal = document.getElementById('resizeModal');
+  const resMode = document.getElementById('resMode');
+  const resColors = document.getElementById('resColors');
+
+  resMode.addEventListener('change', () => {
+    document.getElementById('simplifyColorsWrap').classList.toggle('hidden', resMode.value !== 'simplify');
+    document.getElementById('simplifyColorsWrap').classList.toggle('flex', resMode.value === 'simplify');
+  });
+  resColors.addEventListener('input', () => document.getElementById('resColorsLabel').textContent = `${resColors.value} cores`);
+
+  document.getElementById('btnOpenResize').addEventListener('click', () => {
+    document.getElementById('resW').value = state.gridW;
+    document.getElementById('resH').value = state.gridH;
+    resizeModal.classList.remove('hidden');
+  });
+  document.getElementById('closeResizeModal').addEventListener('click', () => resizeModal.classList.add('hidden'));
+
+  function resampleLayerBuffer(srcBuf, oldW, oldH, newW, newH, mode) {
+    const newBuf = new Uint8Array(newW * newH * 4);
+    if (mode === 'amplify') {
+      for (let y = 0; y < newH; y++) {
+        const srcY = Math.floor((y / newH) * oldH);
+        for (let x = 0; x < newW; x++) {
+          const srcX = Math.floor((x / newW) * oldW);
+          const sIdx = (srcY * oldW + srcX) * 4;
+          const dIdx = (y * newW + x) * 4;
+          newBuf[dIdx] = srcBuf[sIdx]; newBuf[dIdx+1] = srcBuf[sIdx+1];
+          newBuf[dIdx+2] = srcBuf[sIdx+2]; newBuf[dIdx+3] = srcBuf[sIdx+3];
+        }
+      }
+    } else {
+      const srcCanvas = document.createElement('canvas');
+      srcCanvas.width = oldW; srcCanvas.height = oldH;
+      srcCanvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(srcBuf), oldW, oldH), 0, 0);
+
+      const dstCanvas = document.createElement('canvas');
+      dstCanvas.width = newW; dstCanvas.height = newH;
+      const dCtx = dstCanvas.getContext('2d');
+      dCtx.imageSmoothingEnabled = (mode === 'smooth');
+      dCtx.drawImage(srcCanvas, 0, 0, newW, newH);
+
+      const resData = new Uint8Array(dCtx.getImageData(0, 0, newW, newH).data);
+      if (mode === 'simplify') {
+        quantizeBuffer(resData, parseInt(resColors.value, 10) || 8);
+      } else {
+        for (let i = 0; i < resData.length; i += 4) {
+          if (resData[i+3] < 128) { resData[i] = 0; resData[i+1] = 0; resData[i+2] = 0; resData[i+3] = 0; }
+          else resData[i+3] = 255;
+        }
+      }
+      newBuf.set(resData);
+    }
+    return newBuf;
   }
 
-  document.getElementById('btnZoomIn').addEventListener('click', () => setZoom(zoomLevel + 0.5));
-  document.getElementById('btnZoomOut').addEventListener('click', () => setZoom(zoomLevel - 0.5));
-  document.getElementById('btnZoomReset').addEventListener('click', () => { zoomLevel = 1; panX = 0; panY = 0; applyTransform(); });
+  document.getElementById('confirmResizeBtn').addEventListener('click', () => {
+    const newW = Math.max(4, Math.min(256, parseInt(document.getElementById('resW').value, 10) || state.gridW));
+    const newH = Math.max(4, Math.min(256, parseInt(document.getElementById('resH').value, 10) || state.gridH));
+    const mode = resMode.value;
+
+    stopPlayback();
+    commitSelection();
+    saveState();
+
+    state.frames.forEach(fr => {
+      fr.layers.forEach(layer => {
+        layer.data = resampleLayerBuffer(layer.data, state.gridW, state.gridH, newW, newH, mode);
+      });
+    });
+
+    state.gridW = newW;
+    state.gridH = newH;
+    fitCanvas();
+    refreshAllUI();
+    resizeModal.classList.add('hidden');
+  });
+
+  // Zoom & Pan
+  function setZoom(newZoom) {
+    state.zoomLevel = Math.max(0.5, Math.min(8, newZoom));
+    if (state.zoomLevel === 1) { state.panX = 0; state.panY = 0; }
+    applyTransform();
+  }
+  document.getElementById('btnZoomIn').addEventListener('click', () => setZoom(state.zoomLevel + 0.5));
+  document.getElementById('btnZoomOut').addEventListener('click', () => setZoom(state.zoomLevel - 0.5));
+  document.getElementById('btnZoomReset').addEventListener('click', () => { state.zoomLevel = 1; state.panX = 0; state.panY = 0; applyTransform(); });
 
   workspace.addEventListener('wheel', e => {
     e.preventDefault();
-    setZoom(zoomLevel + (e.deltaY < 0 ? 0.25 : -0.25));
+    setZoom(state.zoomLevel + (e.deltaY < 0 ? 0.25 : -0.25));
   }, { passive: false });
 
   let initialPinchDist = null;
@@ -1693,11 +2015,10 @@
 
   workspace.addEventListener('touchstart', e => {
     if (e.touches.length === 2) {
-      isDrawing = false;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       initialPinchDist = Math.hypot(dx, dy);
-      initialZoom = zoomLevel;
+      initialZoom = state.zoomLevel;
       lastPanCenter = [(e.touches[0].clientX + e.touches[1].clientX) / 2, (e.touches[0].clientY + e.touches[1].clientY) / 2];
     }
   }, { passive: false });
@@ -1713,8 +2034,8 @@
       const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       if (lastPanCenter) {
-        panX += cx - lastPanCenter[0];
-        panY += cy - lastPanCenter[1];
+        state.panX += cx - lastPanCenter[0];
+        state.panY += cy - lastPanCenter[1];
         applyTransform();
       }
       lastPanCenter = [cx, cy];
@@ -1723,7 +2044,7 @@
 
   workspace.addEventListener('touchend', () => { initialPinchDist = null; lastPanCenter = null; });
 
-  // --- IMAGEM DE FUNDO DA TELA DE APRESENTAÇÃO ---
+  // Fundo da Tela de Apresentação & Fullscreen
   const bgModal = document.getElementById('bgModal');
   document.getElementById('btnBgConfig').addEventListener('click', () => bgModal.classList.remove('hidden'));
   document.getElementById('closeBgModal').addEventListener('click', () => bgModal.classList.add('hidden'));
@@ -1750,7 +2071,6 @@
     bgModal.classList.add('hidden');
   });
 
-  // --- BOTÃO DE TELA CHEIA (FULLSCREEN) ---
   document.getElementById('btnFullscreen').addEventListener('click', () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
@@ -1759,397 +2079,40 @@
     }
   });
 
-  // --- GERENCIADOR DE ANIMAÇÃO, ONION SKIN, QUADROS E EXPORTAÇÃO GIF/WEBP ---
-  const animPanel = document.getElementById('animPanel');
-  const framesList = document.getElementById('framesList');
-
-  function stopPlayback() {
-    if (!isPlaying) return;
-    isPlaying = false;
-    clearInterval(playTimer);
-    playTimer = null;
-    document.getElementById('playIcon').textContent = '▶ Play';
+  // Botões Inferiores & Atalhos
+  document.getElementById('btnUndo').addEventListener('click', undo);
+  document.getElementById('btnRedo').addEventListener('click', redo);
+  document.getElementById('btnGrid').addEventListener('click', e => {
+    state.showGrid = !state.showGrid;
+    e.currentTarget.classList.toggle('active', state.showGrid);
     render();
-  }
-
-  function renderFramesUI() {
-    if (!framesList) return;
-    framesList.innerHTML = '';
-    frames.forEach((fr, idx) => {
-      const isSelected = idx === activeFrameIdx;
-      const card = document.createElement('button');
-      card.type = 'button';
-      card.className = `relative flex flex-col items-center p-1 rounded-lg border shrink-0 transition ${isSelected ? 'border-orange-500 bg-orange-950/40' : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'}`;
-
-      const thumb = document.createElement('canvas');
-      thumb.width = gridW;
-      thumb.height = gridH;
-      thumb.className = 'w-11 h-11 rounded bg-zinc-950 border border-zinc-800';
-      const tCtx = thumb.getContext('2d');
-      const comp = getCompositeBuffer(null, idx);
-      tCtx.putImageData(new ImageData(new Uint8ClampedArray(comp), gridW, gridH), 0, 0);
-
-      const badge = document.createElement('span');
-      badge.className = `text-[10px] font-mono mt-0.5 ${isSelected ? 'text-orange-400 font-bold' : 'text-zinc-400'}`;
-      badge.textContent = `#${idx + 1}`;
-
-      card.appendChild(thumb);
-      card.appendChild(badge);
-      card.addEventListener('click', () => {
-        stopPlayback();
-        commitSelection();
-        frames[activeFrameIdx].layers = layers;
-        frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
-        activeFrameIdx = idx;
-        syncActiveFrameRefs();
-        renderLayersUI();
-        render();
-      });
-      framesList.appendChild(card);
-    });
-  }
-
-  document.getElementById('btnToggleAnim').addEventListener('click', () => {
-    animPanel.classList.toggle('hidden');
-    renderFramesUI();
-    fitCanvas();
   });
-
-  document.getElementById('btnAddFrame').addEventListener('click', () => {
-    stopPlayback();
+  document.getElementById('btnClear').addEventListener('click', () => {
     commitSelection();
     saveState();
-    frames[activeFrameIdx].layers = layers;
-    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
-    frameCounter++;
-    const newFrame = {
-      id: frameCounter,
-      activeLayerIdx: 0,
-      layers: [{ id: 1, name: 'Camada 1', visible: true, data: new Uint8Array(gridW * gridH * 4) }]
-    };
-    frames.splice(activeFrameIdx + 1, 0, newFrame);
-    activeFrameIdx++;
-    syncActiveFrameRefs();
-    renderLayersUI();
+    getActivePixels().fill(0);
     render();
   });
 
-  document.getElementById('btnDupFrame').addEventListener('click', () => {
-    stopPlayback();
-    commitSelection();
-    saveState();
-    frames[activeFrameIdx].layers = layers;
-    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
-    frameCounter++;
-    const dupFrame = {
-      id: frameCounter,
-      activeLayerIdx: activeLayerIdx,
-      layers: cloneLayers(layers)
-    };
-    frames.splice(activeFrameIdx + 1, 0, dupFrame);
-    activeFrameIdx++;
-    syncActiveFrameRefs();
-    renderLayersUI();
-    render();
-  });
-
-  document.getElementById('btnDelFrame').addEventListener('click', () => {
-    if (frames.length <= 1) return alert('A animação precisa ter pelo menos 1 quadro.');
-    stopPlayback();
-    commitSelection();
-    saveState();
-    frames.splice(activeFrameIdx, 1);
-    activeFrameIdx = Math.max(0, activeFrameIdx - 1);
-    syncActiveFrameRefs();
-    renderLayersUI();
-    render();
-  });
-
-  document.getElementById('btnOnionSkin').addEventListener('click', e => {
-    onionSkin = !onionSkin;
-    e.currentTarget.classList.toggle('border-orange-500', onionSkin);
-    e.currentTarget.classList.toggle('text-orange-400', onionSkin);
-    render();
-  });
-
-  document.getElementById('fpsInput').addEventListener('change', e => {
-    fps = Math.max(1, Math.min(30, parseInt(e.target.value, 10) || 8));
-    e.target.value = fps;
-    if (isPlaying) {
-      stopPlayback();
-      document.getElementById('btnPlayAnim').click();
+  window.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+    else if (e.key === 'Enter' && state.selection) { commitSelection(); }
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && state.selection) { state.selection = null; updateSelectionBar(); render(); }
+    else if (!e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+      const k = e.key.toLowerCase();
+      if (k === 'b') selectTool('brush');
+      if (k === 'g') selectTool('bucket');
+      if (k === 'i') selectTool('picker');
+      if (k === 'l') selectTool('line');
+      if (k === 'r') selectTool('rect');
+      if (k === 'm') selectTool('select');
+      if (k === 'e') selectTool('eraser');
     }
   });
 
-  document.getElementById('btnPlayAnim').addEventListener('click', () => {
-    if (isPlaying) {
-      stopPlayback();
-      return;
-    }
-    if (frames.length <= 1) return;
-    commitSelection();
-    frames[activeFrameIdx].layers = layers;
-    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
-    isPlaying = true;
-    document.getElementById('playIcon').textContent = '⏸ Pause';
-    playTimer = setInterval(() => {
-      activeFrameIdx = (activeFrameIdx + 1) % frames.length;
-      syncActiveFrameRefs();
-      render();
-    }, Math.round(1000 / fps));
-  });
-
-  // --- CODIFICADOR GIF ANIMADO NATIVO (LZW + TRANSPARÊNCIA + LOOP INFINITO) ---
-  function encodeAnimatedGIF(w, h, rgbaFrames, fpsVal) {
-    const out = [];
-    const writeBytes = arr => { for (let i = 0; i < arr.length; i++) out.push(arr[i]); };
-    const writeStr = s => { for (let i = 0; i < s.length; i++) out.push(s.charCodeAt(i)); };
-    const writeU16 = v => { out.push(v & 0xff, (v >> 8) & 0xff); };
-
-    // Paleta global de 256 cores (índice 255 reservado para transparência)
-    const palette = new Uint8Array(256 * 3);
-    const colorMap = new Map();
-    let palCount = 0;
-
-    for (const buf of rgbaFrames) {
-      for (let i = 0; i < buf.length; i += 4) {
-        if (buf[i + 3] < 128) continue;
-        // Quantiza levemente para caber em 255 cores caso haja muitas
-        const key = ((buf[i] >> 1) << 14) | ((buf[i + 1] >> 1) << 7) | (buf[i + 2] >> 1);
-        if (!colorMap.has(key) && palCount < 255) {
-          colorMap.set(key, palCount);
-          palette[palCount * 3] = buf[i];
-          palette[palCount * 3 + 1] = buf[i + 1];
-          palette[palCount * 3 + 2] = buf[i + 2];
-          palCount++;
-        }
-      }
-    }
-
-    function nearestColorIdx(r, g, b) {
-      const key = ((r >> 1) << 14) | ((g >> 1) << 7) | (b >> 1);
-      if (colorMap.has(key)) return colorMap.get(key);
-      let best = 0, bestD = Infinity;
-      for (let i = 0; i < palCount; i++) {
-        const dr = r - palette[i * 3], dg = g - palette[i * 3 + 1], db = b - palette[i * 3 + 2];
-        const d = dr * dr + dg * dg + db * db;
-        if (d < bestD) { bestD = d; best = i; }
-      }
-      return best;
-    }
-
-    // Header GIF89a + Logical Screen Descriptor
-    writeStr('GIF89a');
-    writeU16(w);
-    writeU16(h);
-    out.push(0xf7, 255, 0); // Global Color Table Flag (256 cores), bg index 255
-    writeBytes(palette);
-
-    // Application Extension NETSCAPE2.0 (Loop infinito)
-    out.push(0x21, 0xff, 0x0b);
-    writeStr('NETSCAPE2.0');
-    out.push(0x03, 0x01, 0x00, 0x00, 0x00);
-
-    const delayCs = Math.max(2, Math.round(100 / fpsVal));
-
-    // Compressor LZW por quadro
-    function lzwEncode(indices) {
-      const minCodeSize = 8;
-      const clearCode = 256;
-      const eoiCode = 257;
-      const lzwOut = [minCodeSize];
-      let subBlock = [];
-      let bitBuf = 0, bitCount = 0;
-
-      function emitCode(code, size) {
-        bitBuf |= (code << bitCount);
-        bitCount += size;
-        while (bitCount >= 8) {
-          subBlock.push(bitBuf & 0xff);
-          if (subBlock.length === 255) {
-            lzwOut.push(255, ...subBlock);
-            subBlock = [];
-          }
-          bitBuf >>= 8;
-          bitCount -= 8;
-        }
-      }
-
-      let codeSize = 9;
-      let nextCode = 258;
-      let dict = new Map();
-      emitCode(clearCode, codeSize);
-
-      let prefix = indices[0];
-      for (let i = 1; i < indices.length; i++) {
-        const k = indices[i];
-        const pair = (prefix << 8) | k;
-        if (dict.has(pair)) {
-          prefix = dict.get(pair);
-        } else {
-          emitCode(prefix, codeSize);
-          if (nextCode < 4096) {
-            dict.set(pair, nextCode++);
-            if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++;
-          } else {
-            emitCode(clearCode, codeSize);
-            dict.clear();
-            codeSize = 9;
-            nextCode = 258;
-          }
-          prefix = k;
-        }
-      }
-      emitCode(prefix, codeSize);
-      emitCode(eoiCode, codeSize);
-      if (bitCount > 0) subBlock.push(bitBuf & 0xff);
-      if (subBlock.length > 0) lzwOut.push(subBlock.length, ...subBlock);
-      lzwOut.push(0x00);
-      return lzwOut;
-    }
-
-    for (const buf of rgbaFrames) {
-      // Graphic Control Extension (Disposal 2 = limpa quadro para transparente + Transparent Color Index 255)
-      out.push(0x21, 0xf9, 0x04, 0x09);
-      writeU16(delayCs);
-      out.push(255, 0x00);
-
-      // Image Descriptor
-      out.push(0x2c);
-      writeU16(0); writeU16(0);
-      writeU16(w); writeU16(h);
-      out.push(0x00);
-
-      const indices = new Uint8Array(w * h);
-      for (let p = 0, idx = 0; p < buf.length; p += 4, idx++) {
-        indices[idx] = buf[p + 3] < 128 ? 255 : nearestColorIdx(buf[p], buf[p + 1], buf[p + 2]);
-      }
-      writeBytes(lzwEncode(indices));
-    }
-
-    out.push(0x3b); // Trailer
-    return new Blob([new Uint8Array(out)], { type: 'image/gif' });
-  }
-
-  // --- CODIFICADOR WEBP ANIMADO NATIVO (RIFF / VP8X / ANIM / ANMF) ---
-  async function encodeAnimatedWebP(w, h, rgbaFrames, fpsVal) {
-    const delayMs = Math.max(10, Math.round(1000 / fpsVal));
-    const framePayloads = [];
-
-    for (const buf of rgbaFrames) {
-      const c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      const ctx = c.getContext('2d', { alpha: true });
-      ctx.clearRect(0, 0, w, h);
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          const i = (y * w + x) * 4;
-          if (buf[i + 3] > 0) {
-            ctx.fillStyle = `rgba(${buf[i]},${buf[i+1]},${buf[i+2]},${buf[i+3]/255})`;
-            ctx.fillRect(x, y, 1, 1);
-          }
-        }
-      }
-      const blob = await new Promise(res => c.toBlob(res, 'image/webp', 1.0));
-      const ab = new Uint8Array(await blob.arrayBuffer());
-      // Extrai apenas os chunks VP8 / VP8L / ALPH internos do RIFF WebP estático
-      let pos = 12;
-      const chunks = [];
-      while (pos + 8 <= ab.length) {
-        const tag = String.fromCharCode(ab[pos], ab[pos+1], ab[pos+2], ab[pos+3]);
-        const len = ab[pos+4] | (ab[pos+5] << 8) | (ab[pos+6] << 16) | (ab[pos+7] << 24);
-        const paddedLen = len + (len & 1);
-        if (tag === 'VP8 ' || tag === 'VP8L' || tag === 'ALPH') {
-          chunks.push(ab.subarray(pos, pos + 8 + paddedLen));
-        }
-        pos += 8 + paddedLen;
-      }
-      const totalSub = chunks.reduce((s, ch) => s + ch.length, 0);
-      const merged = new Uint8Array(totalSub);
-      let off = 0;
-      for (const ch of chunks) { merged.set(ch, off); off += ch.length; }
-      framePayloads.push(merged);
-    }
-
-    function u32le(v) { return [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff]; }
-    function u24le(v) { return [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff]; }
-    function strBytes(s) { return [...s].map(c => c.charCodeAt(0)); }
-
-    // VP8X chunk (Flags: 0x12 = Animation [0x02] + Alpha [0x10])
-    const vp8x = new Uint8Array([
-      ...strBytes('VP8X'), ...u32le(10),
-      0x12, 0x00, 0x00, 0x00,
-      ...u24le(w - 1), ...u24le(h - 1)
-    ]);
-
-    // ANIM chunk (Fundo transparente 0x00000000 + Loop count 0 = infinito)
-    const anim = new Uint8Array([
-      ...strBytes('ANIM'), ...u32le(6),
-      0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00
-    ]);
-
-    const anmfChunks = framePayloads.map(payload => {
-      const chunkLen = 16 + payload.length;
-      const header = new Uint8Array([
-        ...strBytes('ANMF'), ...u32le(chunkLen),
-        ...u24le(0), ...u24le(0), // X=0, Y=0
-        ...u24le(w - 1), ...u24le(h - 1),
-        ...u24le(delayMs),
-        0x03 // Blend=0 (replace), Dispose=1 (background/transparent)
-      ]);
-      const full = new Uint8Array(8 + chunkLen + (chunkLen & 1));
-      full.set(header, 0);
-      full.set(payload, 24);
-      return full;
-    });
-
-    const bodyLen = vp8x.length + anim.length + anmfChunks.reduce((s, c) => s + c.length, 0);
-    const riff = new Uint8Array(12 + bodyLen);
-    riff.set([...strBytes('RIFF'), ...u32le(4 + bodyLen), ...strBytes('WEBP')], 0);
-    let ptr = 12;
-    riff.set(vp8x, ptr); ptr += vp8x.length;
-    riff.set(anim, ptr); ptr += anim.length;
-    for (const c of anmfChunks) { riff.set(c, ptr); ptr += c.length; }
-
-    return new Blob([riff], { type: 'image/webp' });
-  }
-
-  function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.download = filename;
-    a.href = url;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
-  }
-
-  document.getElementById('btnExportGif').addEventListener('click', () => {
-    stopPlayback();
-    commitSelection();
-    frames[activeFrameIdx].layers = layers;
-    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
-    const allComps = frames.map((_, idx) => getCompositeBuffer(null, idx));
-    const blob = encodeAnimatedGIF(gridW, gridH, allComps, fps);
-    downloadBlob(blob, `pixelbras-anim-${gridW}x${gridH}.gif`);
-  });
-
-  document.getElementById('btnExportAnimWebp').addEventListener('click', async () => {
-    stopPlayback();
-    commitSelection();
-    frames[activeFrameIdx].layers = layers;
-    frames[activeFrameIdx].activeLayerIdx = activeLayerIdx;
-    const allComps = frames.map((_, idx) => getCompositeBuffer(null, idx));
-    const blob = await encodeAnimatedWebP(gridW, gridH, allComps, fps);
-    downloadBlob(blob, `pixelbras-anim-${gridW}x${gridH}.webp`);
-  });
-
-  renderLayersUI();
-  renderFramesUI();
   fitCanvas();
-  render();
+  refreshAllUI();
 </script>
 </body>
 </html>
