@@ -150,6 +150,9 @@
     <div id="statusText" class="text-[11px] font-mono text-zinc-400 truncate">32x32 | 0, 0</div>
 
     <div class="flex items-center gap-1">
+      <button id="btnFullscreen" class="px-2 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-zinc-300 active:scale-95" title="Tela Cheia">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
       <button id="btnGrid" class="tool-btn active px-2 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold active:scale-95" title="Grade">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
       </button>
@@ -735,11 +738,104 @@
     snapshot = null;
   }
 
-  // Listeners Touch + Mouse
-  canvas.addEventListener('touchstart', e => { e.preventDefault(); if (e.touches[0]) handleStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
-  canvas.addEventListener('touchmove', e => { e.preventDefault(); if (e.touches[0]) { lastX = getCoords(e.touches[0].clientX, e.touches[0].clientY)[0]; lastY = getCoords(e.touches[0].clientX, e.touches[0].clientY)[1]; handleMove(e.touches[0].clientX, e.touches[0].clientY); } }, { passive: false });
-  canvas.addEventListener('touchend', e => { e.preventDefault(); handleEnd(); }, { passive: false });
-  canvas.addEventListener('touchcancel', e => { e.preventDefault(); handleEnd(); }, { passive: false });
+  // Listeners Touch + Mouse (com proteção contra risco acidental no Zoom/Pan de 2 dedos)
+  let touchTimer = null;
+  let pendingTouch = null;
+  let isTwoFingerGesture = false;
+
+  function cancelPendingOrActiveStroke() {
+    if (touchTimer) {
+      clearTimeout(touchTimer);
+      touchTimer = null;
+    }
+    pendingTouch = null;
+    if (isDrawing) {
+      // Reverte o traço parcial que acabou de começar antes do 2º dedo tocar
+      isDrawing = false;
+      snapshot = null;
+      if (undoStack.length > 0) {
+        const prev = undoStack.pop();
+        layers = prev.layers;
+        activeLayerIdx = prev.activeIdx;
+        pixels = layers[activeLayerIdx].data;
+        renderLayersUI();
+        updateHistoryUI();
+        render();
+      }
+    }
+    selCreating = false;
+    selDragging = false;
+  }
+
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (e.touches.length >= 2) {
+      isTwoFingerGesture = true;
+      cancelPendingOrActiveStroke();
+      return;
+    }
+    if (e.touches.length === 1 && !isTwoFingerGesture) {
+      const tx = e.touches[0].clientX;
+      const ty = e.touches[0].clientY;
+      pendingTouch = { x: tx, y: ty };
+      touchTimer = setTimeout(() => {
+        if (pendingTouch && !isTwoFingerGesture) {
+          handleStart(pendingTouch.x, pendingTouch.y);
+          pendingTouch = null;
+        }
+        touchTimer = null;
+      }, 65);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length >= 2 || isTwoFingerGesture) {
+      isTwoFingerGesture = true;
+      cancelPendingOrActiveStroke();
+      return;
+    }
+    if (e.touches.length === 1) {
+      const tx = e.touches[0].clientX;
+      const ty = e.touches[0].clientY;
+      // Se moveu bastante com 1 dedo antes dos 65ms, confirma imediatamente o desenho
+      if (pendingTouch) {
+        if (Math.hypot(tx - pendingTouch.x, ty - pendingTouch.y) > 6) {
+          clearTimeout(touchTimer);
+          touchTimer = null;
+          handleStart(pendingTouch.x, pendingTouch.y);
+          pendingTouch = null;
+        } else {
+          return;
+        }
+      }
+      const coords = getCoords(tx, ty);
+      lastX = coords[0]; lastY = coords[1];
+      handleMove(tx, ty);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    if (e.touches.length === 0) {
+      if (pendingTouch && !isTwoFingerGesture) {
+        clearTimeout(touchTimer);
+        touchTimer = null;
+        handleStart(pendingTouch.x, pendingTouch.y);
+        pendingTouch = null;
+      }
+      if (!isTwoFingerGesture) {
+        handleEnd();
+      }
+      isTwoFingerGesture = false;
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchcancel', e => {
+    e.preventDefault();
+    cancelPendingOrActiveStroke();
+    if (e.touches.length === 0) isTwoFingerGesture = false;
+  }, { passive: false });
 
   canvas.addEventListener('mousedown', e => { if (e.button === 0) handleStart(e.clientX, e.clientY); });
   window.addEventListener('mousemove', e => { if (isDrawing || selDragging || selCreating || e.target === canvas) handleMove(e.clientX, e.clientY); });
@@ -753,35 +849,90 @@
     render();
   });
 
-  // --- EXPORTAÇÃO PNG COM FUNDO 100% TRANSPARENTE (ALFA REAL) ---
-  document.getElementById('btnExport').addEventListener('click', () => {
-    commitSelection();
-    const offCanvas = document.createElement('canvas');
-    offCanvas.width = gridW;
-    offCanvas.height = gridH;
-    const ctx = offCanvas.getContext('2d', { alpha: true });
-    ctx.clearRect(0, 0, gridW, gridH);
+  // --- GERADOR DE PNG RGBA NATIVO (CANAL ALFA 100% PRESERVADO SEM FUNDO BRANCO) ---
+  async function encodeRGBAtoPNG(width, height, rgbaData) {
+    const crcTable = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+      crcTable[n] = c;
+    }
+    function crc32(buf) {
+      let crc = 0xffffffff;
+      for (let i = 0; i < buf.length; i++) crc = crcTable[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
+      return (crc ^ 0xffffffff) >>> 0;
+    }
+    function makeChunk(type, data) {
+      const len = data.length;
+      const chunk = new Uint8Array(12 + len);
+      const view = new DataView(chunk.buffer);
+      view.setUint32(0, len, false);
+      for (let i = 0; i < 4; i++) chunk[4 + i] = type.charCodeAt(i);
+      chunk.set(data, 8);
+      view.setUint32(8 + len, crc32(chunk.subarray(4, 8 + len)), false);
+      return chunk;
+    }
 
-    const comp = getCompositeBuffer();
-    // Garante que pixels transparentes tenham RGBA zerado puro
-    for (let i = 0; i < comp.length; i += 4) {
-      if (comp[i + 3] === 0) {
-        comp[i] = 0; comp[i + 1] = 0; comp[i + 2] = 0;
+    // Adiciona byte de filtro (0 = None) no início de cada linha
+    const rawRows = new Uint8Array(height * (1 + width * 4));
+    for (let y = 0; y < height; y++) {
+      const rowOffset = y * (1 + width * 4);
+      rawRows[rowOffset] = 0;
+      const srcStart = y * width * 4;
+      for (let x = 0; x < width * 4; x += 4) {
+        const a = rgbaData[srcStart + x + 3];
+        rawRows[rowOffset + 1 + x]     = a === 0 ? 0 : rgbaData[srcStart + x];
+        rawRows[rowOffset + 1 + x + 1] = a === 0 ? 0 : rgbaData[srcStart + x + 1];
+        rawRows[rowOffset + 1 + x + 2] = a === 0 ? 0 : rgbaData[srcStart + x + 2];
+        rawRows[rowOffset + 1 + x + 3] = a;
       }
     }
-    const imgData = new ImageData(new Uint8ClampedArray(comp), gridW, gridH);
-    ctx.putImageData(imgData, 0, 0);
 
-    offCanvas.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.download = `pixelbras-${gridW}x${gridH}.png`;
-      a.href = url;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }, 'image/png');
+    // Comprime via zlib/deflate nativo do navegador
+    const cs = new CompressionStream('deflate');
+    const writer = cs.writable.getWriter();
+    writer.write(rawRows);
+    writer.close();
+    const compressedChunks = [];
+    const reader = cs.readable.getReader();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      compressedChunks.push(value);
+    }
+    const totalLen = compressedChunks.reduce((acc, c) => acc + c.length, 0);
+    const idatData = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const c of compressedChunks) { idatData.set(c, offset); offset += c.length; }
+
+    const sig = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+    const ihdr = new Uint8Array(13);
+    const ihdrView = new DataView(ihdr.buffer);
+    ihdrView.setUint32(0, width, false);
+    ihdrView.setUint32(4, height, false);
+    ihdr[8] = 8; // 8 bits por canal
+    ihdr[9] = 6; // Tipo 6 = RGBA (Truecolor com Alfa)
+    ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+
+    const cIHDR = makeChunk('IHDR', ihdr);
+    const cIDAT = makeChunk('IDAT', idatData);
+    const cIEND = makeChunk('IEND', new Uint8Array(0));
+
+    return new Blob([sig, cIHDR, cIDAT, cIEND], { type: 'image/png' });
+  }
+
+  document.getElementById('btnExport').addEventListener('click', async () => {
+    commitSelection();
+    const comp = getCompositeBuffer();
+    const blob = await encodeRGBAtoPNG(gridW, gridH, comp);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.download = `pixelbras-${gridW}x${gridH}.png`;
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 
   // --- RODA DE CORES HSV INTERATIVA ---
@@ -1264,6 +1415,15 @@
     workspace.style.backgroundImage = 'none';
     workspace.style.backgroundColor = '';
     bgModal.classList.add('hidden');
+  });
+
+  // --- BOTÃO DE TELA CHEIA (FULLSCREEN) ---
+  document.getElementById('btnFullscreen').addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
   });
 
   renderLayersUI();
