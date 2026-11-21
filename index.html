@@ -1835,9 +1835,108 @@
     return [Math.max(4, Math.min(256, w)), Math.max(4, Math.min(256, h))];
   }
 
-  document.getElementById('fileInput').addEventListener('change', e => {
+  let importedAnimatedFrames = null; // Array de { image: HTMLImageElement, delayMs: number } ou null
+
+  async function parseAnimatedWebP(arrayBuffer) {
+    const ab = new Uint8Array(arrayBuffer);
+    if (ab.length < 24) return null;
+    const riffTag = String.fromCharCode(ab[0], ab[1], ab[2], ab[3]);
+    const webpTag = String.fromCharCode(ab[8], ab[9], ab[10], ab[11]);
+    if (riffTag !== 'RIFF' || webpTag !== 'WEBP') return null;
+
+    let pos = 12;
+    let canvasW = 0, canvasH = 0;
+    const anmfList = [];
+
+    while (pos + 8 <= ab.length) {
+      const tag = String.fromCharCode(ab[pos], ab[pos+1], ab[pos+2], ab[pos+3]);
+      const len = (ab[pos+4] | (ab[pos+5] << 8) | (ab[pos+6] << 16) | (ab[pos+7] << 24)) >>> 0;
+      const paddedLen = len + (len & 1);
+      const dataStart = pos + 8;
+
+      if (tag === 'VP8X' && len >= 10) {
+        canvasW = 1 + (ab[dataStart + 4] | (ab[dataStart + 5] << 8) | (ab[dataStart + 6] << 16));
+        canvasH = 1 + (ab[dataStart + 7] | (ab[dataStart + 8] << 8) | (ab[dataStart + 9] << 16));
+      } else if (tag === 'ANMF' && len > 16) {
+        const fx = (ab[dataStart] | (ab[dataStart+1] << 8) | (ab[dataStart+2] << 16)) * 2;
+        const fy = (ab[dataStart+3] | (ab[dataStart+4] << 8) | (ab[dataStart+5] << 16)) * 2;
+        const fw = 1 + (ab[dataStart+6] | (ab[dataStart+7] << 8) | (ab[dataStart+8] << 16));
+        const fh = 1 + (ab[dataStart+9] | (ab[dataStart+10] << 8) | (ab[dataStart+11] << 16));
+        const delayMs = (ab[dataStart+12] | (ab[dataStart+13] << 8) | (ab[dataStart+14] << 16)) || 100;
+        const flags = ab[dataStart+15];
+        const subChunks = ab.subarray(dataStart + 16, dataStart + len);
+        anmfList.push({ fx, fy, fw, fh, delayMs, flags, subChunks });
+      }
+      pos += 8 + paddedLen;
+    }
+
+    if (anmfList.length <= 1) return null; // WebP estático segue o fluxo normal
+
+    // Reconstrói cada quadro como um WebP estático válido e compõe respeitando blend/dispose
+    const compCanvas = document.createElement('canvas');
+    compCanvas.width = canvasW || anmfList[0].fw;
+    compCanvas.height = canvasH || anmfList[0].fh;
+    const compCtx = compCanvas.getContext('2d', { alpha: true });
+
+    const decodedFrames = [];
+    for (const f of anmfList) {
+      const riffBodyLen = 4 + f.subChunks.length;
+      const singleWebp = new Uint8Array(8 + riffBodyLen);
+      singleWebp.set([0x52, 0x49, 0x46, 0x46], 0); // RIFF
+      singleWebp[4] = riffBodyLen & 0xff;
+      singleWebp[5] = (riffBodyLen >> 8) & 0xff;
+      singleWebp[6] = (riffBodyLen >> 16) & 0xff;
+      singleWebp[7] = (riffBodyLen >> 24) & 0xff;
+      singleWebp.set([0x57, 0x45, 0x42, 0x50], 8); // WEBP
+      singleWebp.set(f.subChunks, 12);
+
+      const blob = new Blob([singleWebp], { type: 'image/webp' });
+      const bmp = await createImageBitmap(blob);
+
+      const prevSnapshot = (f.flags & 1) ? compCtx.getImageData(0, 0, compCanvas.width, compCanvas.height) : null;
+      if (f.flags & 2) compCtx.clearRect(f.fx, f.fy, f.fw, f.fh); // no-blend
+      compCtx.drawImage(bmp, f.fx, f.fy, f.fw, f.fh);
+      bmp.close();
+
+      const frameImg = new Image();
+      frameImg.src = compCanvas.toDataURL('image/png');
+      await new Promise(res => { frameImg.onload = res; });
+      decodedFrames.push({ image: frameImg, delayMs: f.delayMs });
+
+      if (f.flags & 1) {
+        compCtx.clearRect(f.fx, f.fy, f.fw, f.fh);
+      } else if (prevSnapshot) {
+        compCtx.putImageData(prevSnapshot, 0, 0);
+      }
+    }
+
+    return { width: compCanvas.width, height: compCanvas.height, frames: decodedFrames };
+  }
+
+  document.getElementById('fileInput').addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file) return;
+    importedAnimatedFrames = null;
+
+    if (file.type === 'image/webp' || file.name.toLowerCase().endsWith('.webp')) {
+      try {
+        const buf = await file.arrayBuffer();
+        const animData = await parseAnimatedWebP(buf);
+        if (animData && animData.frames.length > 1) {
+          importedAnimatedFrames = animData.frames;
+          importedImageObj = animData.frames[0].image;
+          importedAspectRatio = animData.width / animData.height;
+          const maxPx = parseInt(impMaxInput.value, 10) || 4096;
+          let [baseW, baseH] = clampDimensionsToLimit(animData.width, animData.height, maxPx);
+          impWInput.value = baseW;
+          impHInput.value = baseH;
+          return;
+        }
+      } catch (err) {
+        console.warn('Fallback para imagem estática:', err);
+      }
+    }
+
     const reader = new FileReader();
     reader.onload = ev => {
       const img = new Image();
@@ -1889,31 +1988,47 @@
     let targetH = Math.max(4, Math.round(targetW / importedAspectRatio));
     [targetW, targetH] = clampDimensionsToLimit(targetW, targetH, maxPixels);
 
-    const off = document.createElement('canvas');
-    off.width = targetW; off.height = targetH;
-    const ctx = off.getContext('2d');
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(importedImageObj, 0, 0, targetW, targetH);
-    const raw = new Uint8Array(ctx.getImageData(0, 0, targetW, targetH).data);
-    quantizeBuffer(raw, maxColors);
+    const sourceList = importedAnimatedFrames
+      ? importedAnimatedFrames.map(f => f.image)
+      : [importedImageObj];
 
-    if (document.getElementById('impRemoveBg').checked && raw[3] > 0) {
-      const bgR = raw[0], bgG = raw[1], bgB = raw[2];
-      for (let i = 0; i < raw.length; i += 4) {
-        if (Math.abs(raw[i] - bgR) <= 15 && Math.abs(raw[i+1] - bgG) <= 15 && Math.abs(raw[i+2] - bgB) <= 15) {
-          raw[i] = 0; raw[i+1] = 0; raw[i+2] = 0; raw[i+3] = 0;
+    const removeBg = document.getElementById('impRemoveBg').checked;
+    const newFrames = sourceList.map((srcImg, idx) => {
+      const off = document.createElement('canvas');
+      off.width = targetW; off.height = targetH;
+      const ctx = off.getContext('2d', { alpha: true });
+      ctx.imageSmoothingEnabled = (targetW !== srcImg.naturalWidth || targetH !== srcImg.naturalHeight);
+      ctx.drawImage(srcImg, 0, 0, targetW, targetH);
+      const raw = new Uint8Array(ctx.getImageData(0, 0, targetW, targetH).data);
+      quantizeBuffer(raw, maxColors);
+
+      if (removeBg && raw[3] > 0) {
+        const bgR = raw[0], bgG = raw[1], bgB = raw[2];
+        for (let i = 0; i < raw.length; i += 4) {
+          if (Math.abs(raw[i] - bgR) <= 15 && Math.abs(raw[i+1] - bgG) <= 15 && Math.abs(raw[i+2] - bgB) <= 15) {
+            raw[i] = 0; raw[i+1] = 0; raw[i+2] = 0; raw[i+3] = 0;
+          }
         }
       }
-    }
+
+      return {
+        id: idx + 1,
+        activeLayerIdx: 0,
+        layers: [{ id: 1, name: 'Camada 1', visible: true, data: raw }]
+      };
+    });
 
     state.gridW = targetW;
     state.gridH = targetH;
-    state.frames = [{
-      id: 1,
-      activeLayerIdx: 0,
-      layers: [{ id: 1, name: 'Camada 1', visible: true, data: raw }]
-    }];
+    state.frames = newFrames;
+    state.frameCounter = newFrames.length;
     state.activeFrameIdx = 0;
+
+    if (importedAnimatedFrames && importedAnimatedFrames[0].delayMs > 0) {
+      state.fps = Math.max(1, Math.min(30, Math.round(1000 / importedAnimatedFrames[0].delayMs)));
+      document.getElementById('fpsDisplay').textContent = `${state.fps} FPS`;
+      document.getElementById('animPanel').classList.remove('hidden');
+    }
     fitCanvas();
     refreshAllUI();
     importModal.classList.add('hidden');
