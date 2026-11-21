@@ -1917,10 +1917,17 @@
     const file = e.target.files[0];
     if (!file) return;
     importedAnimatedFrames = null;
+    const confirmBtn = document.getElementById('confirmImportBtn');
+    confirmBtn.textContent = 'Analisando arquivo...';
 
-    if (file.type === 'image/webp' || file.name.toLowerCase().endsWith('.webp')) {
-      try {
-        const buf = await file.arrayBuffer();
+    try {
+      const buf = await file.arrayBuffer();
+      const header = new Uint8Array(buf.slice(0, 12));
+      const isWebP = header.length >= 12 &&
+        String.fromCharCode(header[0], header[1], header[2], header[3]) === 'RIFF' &&
+        String.fromCharCode(header[8], header[9], header[10], header[11]) === 'WEBP';
+
+      if (isWebP) {
         const animData = await parseAnimatedWebP(buf);
         if (animData && animData.frames.length > 1) {
           importedAnimatedFrames = animData.frames;
@@ -1930,11 +1937,12 @@
           let [baseW, baseH] = clampDimensionsToLimit(animData.width, animData.height, maxPx);
           impWInput.value = baseW;
           impHInput.value = baseH;
+          confirmBtn.textContent = `Importar Animação (${animData.frames.length} quadros)`;
           return;
         }
-      } catch (err) {
-        console.warn('Fallback para imagem estática:', err);
       }
+    } catch (err) {
+      console.warn('Fallback para imagem estática:', err);
     }
 
     const reader = new FileReader();
@@ -1949,6 +1957,7 @@
         [baseW, baseH] = clampDimensionsToLimit(baseW, baseH, maxPx);
         impWInput.value = baseW;
         impHInput.value = baseH;
+        confirmBtn.textContent = 'Importar para Camada Ativa';
       };
       img.src = ev.target.result;
     };
