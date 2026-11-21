@@ -2,18 +2,46 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>PixelBras - Editor WebGL</title>
 <style>
-  body { margin: 0; background: #121214; color: #e1e1e6; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; user-select: none; }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: #202024; padding: 10px 16px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #323238; max-width: 95vw; }
-  .divider { width: 1px; height: 24px; background: #323238; margin: 0 4px; }
-  button { background: #29292e; color: #e1e1e6; border: 1px solid #323238; padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; transition: 0.15s; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { 
+    margin: 0; padding: 12px; background: #121214; color: #e1e1e6; 
+    font-family: system-ui, sans-serif; display: flex; flex-direction: column; 
+    align-items: center; justify-content: center; min-height: 100dvh; 
+    user-select: none; overflow-x: hidden;
+  }
+  .toolbar { 
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center;
+    background: #202024; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; 
+    border: 1px solid #323238; width: 100%; max-width: 640px; 
+  }
+  .divider { width: 1px; height: 24px; background: #323238; margin: 0 2px; }
+  button { 
+    background: #29292e; color: #e1e1e6; border: 1px solid #323238; 
+    padding: 8px 10px; border-radius: 6px; cursor: pointer; 
+    display: flex; align-items: center; justify-content: center; gap: 6px; 
+    font-size: 13px; font-weight: 600; transition: 0.15s; min-height: 38px;
+  }
   button:hover:not(:disabled) { background: #323238; }
   button:disabled { opacity: 0.4; cursor: not-allowed; }
-  button.active { border-color: #04d361; color: #04d361; background: rgba(4, 211, 97, 0.1); }
-  input[type="color"] { border: none; width: 32px; height: 32px; cursor: pointer; background: none; padding: 0; }
-  canvas { border: 2px solid #323238; image-rendering: pixelated; cursor: crosshair; box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
-  .status { margin-top: 10px; font-size: 12px; color: #8d8d99; display: flex; gap: 16px; }
+  button.active { border-color: #04d361; color: #04d361; background: rgba(4, 211, 97, 0.12); }
+  input[type="color"] { border: none; width: 38px; height: 38px; cursor: pointer; background: none; padding: 0; border-radius: 6px; }
+  canvas { 
+    border: 2px solid #323238; image-rendering: pixelated; cursor: crosshair; 
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6); touch-action: none; 
+    width: min(92vw, 512px); height: min(92vw, 512px);
+  }
+  .status { 
+    margin-top: 10px; font-size: 12px; color: #8d8d99; display: flex; 
+    flex-wrap: wrap; justify-content: center; gap: 12px; text-align: center; 
+  }
+  @media (max-width: 520px) {
+    .btn-label { display: none; }
+    button { padding: 8px 11px; }
+    .shortcuts-hint { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -29,60 +57,60 @@
   <input type="color" id="colorPicker" value="#04d361" title="Cor Atual">
   
   <button id="tool-brush" class="active" title="Pincel (B)">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>
-    Pincel
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>
+    <span class="btn-label">Pincel</span>
   </button>
   
   <button id="tool-bucket" title="Balde de Tinta (G)">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>
-    Balde
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>
+    <span class="btn-label">Balde</span>
   </button>
 
   <button id="tool-picker" title="Conta-Gotas (I)">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>
-    Conta-Gotas
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>
+    <span class="btn-label">Gotas</span>
   </button>
 
   <button id="tool-line" title="Linha Reta (L)">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="19" x2="19" y2="5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg>
-    Linha
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="19" x2="19" y2="5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg>
+    <span class="btn-label">Linha</span>
   </button>
 
   <button id="tool-rect" title="Retângulo (R)">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-    Retângulo
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+    <span class="btn-label">Retângulo</span>
   </button>
 
   <button id="tool-eraser" title="Borracha (E)">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
-    Borracha
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+    <span class="btn-label">Borracha</span>
   </button>
 
   <div class="divider"></div>
 
   <button id="btnUndo" title="Desfazer (Ctrl+Z)" disabled>
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
-    Undo
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+    <span class="btn-label">Undo</span>
   </button>
 
   <button id="btnRedo" title="Refazer (Ctrl+Y)" disabled>
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
-    Redo
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+    <span class="btn-label">Redo</span>
   </button>
 
   <button id="btnGrid" class="active" title="Alternar Grade">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-    Grade
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+    <span class="btn-label">Grade</span>
   </button>
 
   <button id="btnClear" title="Limpar Tela">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
-    Limpar
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
+    <span class="btn-label">Limpar</span>
   </button>
 
   <button id="btnExport" title="Baixar PNG">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    PNG
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    <span class="btn-label">PNG</span>
   </button>
 </div>
 
@@ -90,8 +118,8 @@
 
 <div class="status">
   <span id="coords">Posição: 0, 0</span>
-  <span id="historyInfo">Histórico: 0 estados</span>
-  <span>Atalhos: B (Pincel) | G (Balde) | I (Conta-gotas) | L (Linha) | R (Retângulo) | E (Borracha) | Ctrl+Z / Ctrl+Y</span>
+  <span id="historyInfo">Histórico: 0 undo / 0 redo</span>
+  <span class="shortcuts-hint">Atalhos: B | G | I | L | R | E | Ctrl+Z / Ctrl+Y</span>
 </div>
 
 <script>
@@ -100,7 +128,6 @@
   const canvas = document.getElementById('glcanvas');
   const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
 
-  // Shaders WebGL
   const vsSource = `
     attribute vec2 a_pos;
     varying vec2 v_uv;
@@ -161,7 +188,6 @@
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-  // Estado e Histórico Ilimitado (Undo / Redo)
   let pixels = new Uint8Array(GRID * GRID * 4);
   let snapshot = null;
   const undoStack = [];
@@ -169,7 +195,7 @@
 
   function saveState() {
     undoStack.push(new Uint8Array(pixels));
-    redoStack.length = 0; // Limpa redo ao fazer nova ação
+    redoStack.length = 0;
     updateHistoryUI();
   }
 
@@ -200,9 +226,9 @@
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  // Manipulação de Pixels e Ferramentas
   let currentTool = 'brush';
   let isDrawing = false;
+  let activePointerId = null;
   let startX = 0, startY = 0;
   let showGrid = true;
   const colorPicker = document.getElementById('colorPicker');
@@ -235,7 +261,6 @@
     return c1[0] === c2[0] && c1[1] === c2[1] && c1[2] === c2[2] && c1[3] === c2[3];
   }
 
-  // Algoritmo Flood Fill (Balde de Tinta)
   function floodFill(x, y, fillColor) {
     const targetColor = getPixel(pixels, x, y);
     if (colorsMatch(targetColor, fillColor)) return false;
@@ -258,7 +283,6 @@
     return true;
   }
 
-  // Algoritmo de Bresenham para Linha Reta
   function drawLine(buf, x0, y0, x1, y1, color) {
     let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
@@ -272,7 +296,6 @@
     }
   }
 
-  // Desenho de Retângulo
   function drawRect(buf, x0, y0, x1, y1, color) {
     const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
     const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
@@ -286,7 +309,6 @@
     }
   }
 
-  // Seleção de Ferramentas
   const tools = ['brush', 'bucket', 'picker', 'line', 'rect', 'eraser'];
   function selectTool(name) {
     currentTool = name;
@@ -298,7 +320,6 @@
     document.getElementById(`tool-${t}`).onclick = () => selectTool(t);
   });
 
-  // Eventos do Mouse no Canvas
   function getGridCoords(e) {
     const rect = canvas.getBoundingClientRect();
     const x = Math.floor(((e.clientX - rect.left) / rect.width) * GRID);
@@ -306,24 +327,32 @@
     return [Math.max(0, Math.min(GRID - 1, x)), Math.max(0, Math.min(GRID - 1, y))];
   }
 
-  canvas.onmousedown = (e) => {
+  // Suporte unificado Mouse + Touch + Caneta (Pointer Events)
+  canvas.addEventListener('pointerdown', (e) => {
+    if (activePointerId !== null) return; // Ignora segundo dedo (pinch/scroll acidental)
+    activePointerId = e.pointerId;
+    canvas.setPointerCapture(e.pointerId);
+
     const [x, y] = getGridCoords(e);
+    document.getElementById('coords').textContent = `Posição: ${x}, ${y}`;
     const activeColor = currentTool === 'eraser' ? BG_COLOR : hexToRgba(colorPicker.value);
 
     if (currentTool === 'picker') {
       const picked = getPixel(pixels, x, y);
       colorPicker.value = rgbaToHex(picked[0], picked[1], picked[2]);
       selectTool('brush');
+      activePointerId = null;
       return;
     }
 
     if (currentTool === 'bucket') {
       saveState();
       if (!floodFill(x, y, activeColor)) {
-        undoStack.pop(); // Não salva estado se nada mudou
+        undoStack.pop();
         updateHistoryUI();
       }
       render();
+      activePointerId = null;
       return;
     }
 
@@ -337,13 +366,14 @@
       setPixel(pixels, x, y, activeColor);
       render();
     }
-  };
+  });
 
-  canvas.onmousemove = (e) => {
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== activePointerId && e.pointerType !== 'mouse') return;
     const [x, y] = getGridCoords(e);
     document.getElementById('coords').textContent = `Posição: ${x}, ${y}`;
 
-    if (!isDrawing) return;
+    if (!isDrawing || e.pointerId !== activePointerId) return;
     const activeColor = currentTool === 'eraser' ? BG_COLOR : hexToRgba(colorPicker.value);
 
     if (currentTool === 'brush' || currentTool === 'eraser') {
@@ -359,25 +389,30 @@
       drawRect(preview, startX, startY, x, y, activeColor);
       render(preview);
     }
-  };
+  });
 
-  window.onmouseup = (e) => {
-    if (!isDrawing) return;
-    const [x, y] = getGridCoords(e);
-    const activeColor = hexToRgba(colorPicker.value);
+  function finishStroke(e) {
+    if (e.pointerId !== activePointerId) return;
+    if (isDrawing) {
+      const [x, y] = getGridCoords(e);
+      const activeColor = hexToRgba(colorPicker.value);
 
-    if (currentTool === 'line') {
-      drawLine(pixels, startX, startY, x, y, activeColor);
-      render();
-    } else if (currentTool === 'rect') {
-      drawRect(pixels, startX, startY, x, y, activeColor);
-      render();
+      if (currentTool === 'line') {
+        drawLine(pixels, startX, startY, x, y, activeColor);
+        render();
+      } else if (currentTool === 'rect') {
+        drawRect(pixels, startX, startY, x, y, activeColor);
+        render();
+      }
     }
     isDrawing = false;
     snapshot = null;
-  };
+    activePointerId = null;
+  }
 
-  // Botões de Ação
+  canvas.addEventListener('pointerup', finishStroke);
+  canvas.addEventListener('pointercancel', finishStroke);
+
   document.getElementById('btnUndo').onclick = undo;
   document.getElementById('btnRedo').onclick = redo;
   
@@ -397,7 +432,6 @@
   };
 
   document.getElementById('btnExport').onclick = () => {
-    // Exporta sem a grade para a imagem ficar limpa
     gl.uniform1f(uShowGridLoc, 0.0);
     render();
     const a = document.createElement('a');
@@ -408,7 +442,6 @@
     render();
   };
 
-  // Atalhos de Teclado
   window.onkeydown = (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       e.preventDefault();
@@ -427,7 +460,6 @@
     }
   };
 
-  // Inicialização
   for (let i = 0; i < pixels.length; i += 4) {
     pixels[i] = BG_COLOR[0]; pixels[i+1] = BG_COLOR[1]; pixels[i+2] = BG_COLOR[2]; pixels[i+3] = BG_COLOR[3];
   }
