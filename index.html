@@ -141,10 +141,11 @@
         <button id="btnOnionSkin" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 font-semibold active:scale-95" title="Ativar/Desativar Onion Skin">
           🧅 Onion Skin
         </button>
-        <label class="flex items-center gap-1 text-zinc-300 font-mono">
-          <span>FPS:</span>
-          <input type="number" id="fpsInput" value="8" min="1" max="30" class="w-12 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-1 text-center text-xs text-orange-400 font-bold">
-        </label>
+        <div class="flex items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-lg p-0.5 font-mono">
+          <button type="button" id="btnFpsDown" class="w-8 h-8 flex items-center justify-center rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-100 font-bold text-base active:scale-95" title="Diminuir FPS">-</button>
+          <span id="fpsDisplay" class="px-2 text-xs text-orange-400 font-bold whitespace-nowrap">8 FPS</span>
+          <button type="button" id="btnFpsUp" class="w-8 h-8 flex items-center justify-center rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-100 font-bold text-base active:scale-95" title="Aumentar FPS">+</button>
+        </div>
       </div>
 
       <div class="flex items-center gap-1">
@@ -1544,14 +1545,16 @@
     render();
   });
 
-  document.getElementById('fpsInput').addEventListener('change', e => {
-    state.fps = Math.max(1, Math.min(30, parseInt(e.target.value, 10) || 8));
-    e.target.value = state.fps;
+  function updateFps(delta) {
+    state.fps = Math.max(1, Math.min(30, state.fps + delta));
+    document.getElementById('fpsDisplay').textContent = `${state.fps} FPS`;
     if (state.isPlaying) {
       stopPlayback();
       document.getElementById('btnPlayAnim').click();
     }
-  });
+  }
+  document.getElementById('btnFpsDown').addEventListener('click', () => updateFps(-1));
+  document.getElementById('btnFpsUp').addEventListener('click', () => updateFps(1));
 
   document.getElementById('btnPlayAnim').addEventListener('click', () => {
     if (state.isPlaying) {
