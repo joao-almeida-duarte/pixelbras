@@ -1276,63 +1276,109 @@
     }
   }
 
-  // --- MODAL IMPORTAR IMAGEM COM LIMITE DE PIXELS ---
+  // --- MODAL IMPORTAR IMAGEM MANTENDO PROPORÇÃO ORIGINAL ---
   const importModal = document.getElementById('importModal');
   const impColors = document.getElementById('impColors');
+  const impWInput = document.getElementById('impW');
+  const impHInput = document.getElementById('impH');
+  const impMaxInput = document.getElementById('impMaxPixels');
+  let importedImageObj = null;
+  let importedAspectRatio = 1;
+
   impColors.addEventListener('input', () => document.getElementById('impColorsLabel').textContent = `${impColors.value} cores`);
+
+  function clampDimensionsToLimit(w, h, maxPx) {
+    if (w * h > maxPx) {
+      const scale = Math.sqrt(maxPx / (w * h));
+      w = Math.max(4, Math.floor(w * scale));
+      h = Math.max(4, Math.floor(h * scale));
+    }
+    return [Math.max(4, Math.min(256, w)), Math.max(4, Math.min(256, h))];
+  }
+
+  document.getElementById('fileInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        importedImageObj = img;
+        importedAspectRatio = img.naturalWidth / img.naturalHeight;
+        const maxPx = parseInt(impMaxInput.value) || 4096;
+        let baseW = parseInt(impWInput.value) || 32;
+        let baseH = Math.max(4, Math.round(baseW / importedAspectRatio));
+        [baseW, baseH] = clampDimensionsToLimit(baseW, baseH, maxPx);
+        impWInput.value = baseW;
+        impHInput.value = baseH;
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  impWInput.addEventListener('input', () => {
+    if (!importedImageObj) return;
+    const maxPx = parseInt(impMaxInput.value) || 4096;
+    let w = Math.max(4, parseInt(impWInput.value) || 4);
+    let h = Math.max(4, Math.round(w / importedAspectRatio));
+    [w, h] = clampDimensionsToLimit(w, h, maxPx);
+    impHInput.value = h;
+  });
+
+  impHInput.addEventListener('input', () => {
+    if (!importedImageObj) return;
+    const maxPx = parseInt(impMaxInput.value) || 4096;
+    let h = Math.max(4, parseInt(impHInput.value) || 4);
+    let w = Math.max(4, Math.round(h * importedAspectRatio));
+    [w, h] = clampDimensionsToLimit(w, h, maxPx);
+    impWInput.value = w;
+  });
 
   document.getElementById('btnOpenImport').addEventListener('click', () => importModal.classList.remove('hidden'));
   document.getElementById('closeImportModal').addEventListener('click', () => importModal.classList.add('hidden'));
 
   document.getElementById('confirmImportBtn').addEventListener('click', () => {
-    const file = document.getElementById('fileInput').files[0];
-    if (!file) return alert('Selecione uma imagem primeiro.');
+    if (!importedImageObj) return alert('Selecione uma imagem primeiro.');
 
-    let targetW = parseInt(document.getElementById('impW').value) || 32;
-    let targetH = parseInt(document.getElementById('impH').value) || 32;
-    const maxPixels = parseInt(document.getElementById('impMaxPixels').value) || 4096;
+    const maxPixels = parseInt(impMaxInput.value) || 4096;
     const maxColors = parseInt(impColors.value) || 16;
+    let targetW = parseInt(impWInput.value) || 32;
+    let targetH = Math.max(4, Math.round(targetW / importedAspectRatio));
+    [targetW, targetH] = clampDimensionsToLimit(targetW, targetH, maxPixels);
 
-    // Aplica o limite máximo de pixels mantendo a proporção
-    if (targetW * targetH > maxPixels) {
-      const scale = Math.sqrt(maxPixels / (targetW * targetH));
-      targetW = Math.max(4, Math.floor(targetW * scale));
-      targetH = Math.max(4, Math.floor(targetH * scale));
+    commitSelection();
+    saveState();
+    const off = document.createElement('canvas');
+    off.width = targetW; off.height = targetH;
+    const ctx = off.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(importedImageObj, 0, 0, targetW, targetH);
+    const raw = new Uint8Array(ctx.getImageData(0, 0, targetW, targetH).data);
+    quantizeBuffer(raw, maxColors);
+    if (document.getElementById('impRemoveBg').checked && raw[3] > 0) {
+      const bgR = raw[0], bgG = raw[1], bgB = raw[2];
+      for (let i = 0; i < raw.length; i += 4) {
+        if (Math.abs(raw[i] - bgR) <= 15 && Math.abs(raw[i+1] - bgG) <= 15 && Math.abs(raw[i+2] - bgB) <= 15) {
+          raw[i] = 0; raw[i+1] = 0; raw[i+2] = 0; raw[i+3] = 0;
+        }
+      }
     }
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        commitSelection();
-        saveState();
-        const off = document.createElement('canvas');
-        off.width = targetW; off.height = targetH;
-        const ctx = off.getContext('2d');
-        ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(img, 0, 0, targetW, targetH);
-        const raw = new Uint8Array(ctx.getImageData(0, 0, targetW, targetH).data);
-        quantizeBuffer(raw, maxColors);
-        if (document.getElementById('impRemoveBg').checked && raw[3] > 0) {
-          const bgR = raw[0], bgG = raw[1], bgB = raw[2];
-          for (let i = 0; i < raw.length; i += 4) {
-            if (Math.abs(raw[i] - bgR) <= 15 && Math.abs(raw[i+1] - bgG) <= 15 && Math.abs(raw[i+2] - bgB) <= 15) {
-              raw[i] = 0; raw[i+1] = 0; raw[i+2] = 0; raw[i+3] = 0;
-            }
-          }
-        }
-
-        gridW = targetW; gridH = targetH;
-        layers = [{ id: 1, name: 'Camada 1', visible: true, data: raw }];
-        activeLayerIdx = 0; pixels = layers[0].data; renderLayersUI();
-        fitCanvas();
-        render();
-        updateStatus(0, 0);
-        importModal.classList.add('hidden');
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
+    gridW = targetW; gridH = targetH;
+    frames = [{
+      id: 1,
+      activeLayerIdx: 0,
+      layers: [{ id: 1, name: 'Camada 1', visible: true, data: raw }]
+    }];
+    activeFrameIdx = 0;
+    syncActiveFrameRefs();
+    renderLayersUI();
+    renderFramesUI();
+    fitCanvas();
+    render();
+    updateStatus(0, 0);
+    importModal.classList.add('hidden');
   });
 
   // --- MODAL REDIMENSIONAR / AMPLIFICAR / SIMPLIFICAR ---
