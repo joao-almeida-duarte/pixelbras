@@ -550,6 +550,12 @@
   // =========================================================================
   // 1. FONTE ÚNICA DE VERDADE (ESTADO CENTRALIZADO DE QUADROS E CAMADAS)
   // =========================================================================
+  const MAX_GRID_SIZE = 2048;
+  ['impW', 'impH', 'resW', 'resH'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.max = String(MAX_GRID_SIZE);
+  });
+
   const state = {
     gridW: 32,
     gridH: 32,
@@ -889,16 +895,43 @@
     return comp;
   }
 
+  let _reusableMaskBuf = null;
+  let _reusableSubBuf = null;
+  let _framesUITimer = null;
+  let _texAllocatedW = 0, _texAllocatedH = 0;
+
+  function scheduleFramesUIUpdate() {
+    if (state.isPlaying || document.getElementById('animPanel').classList.contains('hidden')) return;
+    if (_framesUITimer) return;
+    _framesUITimer = setTimeout(() => {
+      _framesUITimer = null;
+      if (!state.isPlaying && !document.getElementById('animPanel').classList.contains('hidden')) {
+        renderFramesUI();
+      }
+    }, 120);
+  }
+
   function buildFullGridMaskTexture(previewMask = null) {
-    const maskTexBuf = new Uint8Array(state.gridW * state.gridH * 4);
-    let hasAny = false;
     const activeMask = (typeof transformEngine !== 'undefined' && transformEngine.state.active)
       ? transformEngine.getActiveFrameMask()
       : ((typeof maskGroupManager !== 'undefined') ? maskGroupManager.getCurrentActiveMaskBytes() : null);
+
+    if (!activeMask && !previewMask) {
+      return { buf: null, hasAny: false };
+    }
+
+    const needed = state.gridW * state.gridH * 4;
+    if (!_reusableMaskBuf || _reusableMaskBuf.length !== needed) {
+      _reusableMaskBuf = new Uint8Array(needed);
+    } else {
+      _reusableMaskBuf.fill(0);
+    }
+
+    let hasAny = false;
     if (activeMask) {
       for (let i = 0; i < activeMask.length; i++) {
         if (activeMask[i]) {
-          maskTexBuf[i * 4 + 3] = 255;
+          _reusableMaskBuf[i * 4 + 3] = 255;
           hasAny = true;
         }
       }
@@ -907,13 +940,70 @@
       const isNegPreview = (typeof transformEngine !== 'undefined' && transformEngine.state.mode === 'sub');
       for (let i = 0; i < previewMask.length; i++) {
         if (previewMask[i]) {
-          if (isNegPreview) maskTexBuf[i * 4] = 255;
-          maskTexBuf[i * 4 + 3] = 255;
+          if (isNegPreview) _reusableMaskBuf[i * 4] = 255;
+          _reusableMaskBuf[i * 4 + 3] = 255;
           hasAny = true;
         }
       }
     }
-    return { buf: maskTexBuf, hasAny };
+    return { buf: _reusableMaskBuf, hasAny };
+  }
+
+  // Atualiza apenas o retângulo sujo (Dirty Rect) na GPU via texSubImage2D
+  function renderDirtyRect(x0, y0, x1, y1, pad = 2) {
+    if (_texAllocatedW !== state.gridW || _texAllocatedH !== state.gridH || (typeof transformEngine !== 'undefined' && transformEngine.state.active)) {
+      render();
+      return;
+    }
+
+    const minX = Math.max(0, Math.min(x0, x1) - pad);
+    const minY = Math.max(0, Math.min(y0, y1) - pad);
+    const maxX = Math.min(state.gridW - 1, Math.max(x0, x1) + pad);
+    const maxY = Math.min(state.gridH - 1, Math.max(y0, y1) + pad);
+    const rw = maxX - minX + 1;
+    const rh = maxY - minY + 1;
+    if (rw <= 0 || rh <= 0) return;
+
+    const needed = rw * rh * 4;
+    if (!_reusableSubBuf || _reusableSubBuf.length < needed) {
+      _reusableSubBuf = new Uint8Array(needed);
+    }
+    const sub = _reusableSubBuf.subarray(0, needed);
+    sub.fill(0);
+
+    const fr = state.frames[state.activeFrameIdx];
+    const gw = state.gridW;
+    for (let i = 0; i < fr.layers.length; i++) {
+      if (!fr.layers[i].visible) continue;
+      const src = fr.layers[i].data;
+      for (let ry = 0; ry < rh; ry++) {
+        const gy = minY + ry;
+        let srcRow = (gy * gw + minX) * 4;
+        let dstRow = (ry * rw) * 4;
+        for (let rx = 0; rx < rw; rx++) {
+          const sp = srcRow + (rx << 2);
+          const srcA = src[sp + 3];
+          if (srcA === 0) continue;
+          const dp = dstRow + (rx << 2);
+          if (srcA === 255 || sub[dp + 3] === 0) {
+            sub[dp] = src[sp]; sub[dp + 1] = src[sp + 1];
+            sub[dp + 2] = src[sp + 2]; sub[dp + 3] = srcA;
+          } else {
+            const a = srcA / 255, dstA = sub[dp + 3] / 255, outA = a + dstA * (1 - a);
+            sub[dp]     = Math.round((src[sp] * a + sub[dp] * dstA * (1 - a)) / outA);
+            sub[dp + 1] = Math.round((src[sp + 1] * a + sub[dp + 1] * dstA * (1 - a)) / outA);
+            sub[dp + 2] = Math.round((src[sp + 2] * a + sub[dp + 2] * dstA * (1 - a)) / outA);
+            sub[dp + 3] = Math.round(outA * 255);
+          }
+        }
+      }
+    }
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, minX, minY, rw, rh, gl.RGBA, gl.UNSIGNED_BYTE, sub);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    scheduleFramesUIUpdate();
   }
 
   function render(overrideActiveLayerData = null, previewMask = null) {
@@ -934,6 +1024,8 @@
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, bufToDraw);
+    _texAllocatedW = state.gridW;
+    _texAllocatedH = state.gridH;
 
     if (showOnion > 0.5) {
       const emptyBuf = new Uint8Array(state.gridW * state.gridH * 4);
@@ -951,9 +1043,7 @@
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     if (typeof transformEngine !== 'undefined') transformEngine.drawOverlay();
-    if (!state.isPlaying && !document.getElementById('animPanel').classList.contains('hidden')) {
-      renderFramesUI();
-    }
+    scheduleFramesUIUpdate();
   }
 
   // =========================================================================
@@ -1389,7 +1479,7 @@
 
     if (inside && (state.currentTool === 'brush' || state.currentTool === 'eraser')) {
       setPixel(activeBuf, state.gridW, state.gridH, ux, uy, activeColor, state.brushSize);
-      render();
+      renderDirtyRect(ux, uy, ux, uy, Math.max(4, state.brushSize * 2));
     }
   }
 
@@ -1471,6 +1561,8 @@
 
     if (state.currentTool === 'brush' || state.currentTool === 'eraser') {
       if (!inside) { hasEnteredCanvas = false; return; }
+      const prevX = hasEnteredCanvas ? startX : ux;
+      const prevY = hasEnteredCanvas ? startY : uy;
       if (!hasEnteredCanvas) {
         setPixel(activeBuf, state.gridW, state.gridH, ux, uy, activeColor, state.brushSize);
         hasEnteredCanvas = true;
@@ -1478,7 +1570,7 @@
         drawLine(activeBuf, startX, startY, ux, uy, activeColor, state.brushSize);
       }
       startX = ux; startY = uy;
-      render();
+      renderDirtyRect(prevX, prevY, ux, uy, Math.max(4, state.brushSize * 2));
     } else if (state.currentTool === 'line') {
       const preview = new Uint8Array(strokeSnapshot);
       drawLine(preview, startX, startY, x, y, activeColor, state.brushSize);
@@ -2565,7 +2657,7 @@
       w = Math.max(4, Math.floor(w * scale));
       h = Math.max(4, Math.floor(h * scale));
     }
-    return [Math.max(4, Math.min(256, w)), Math.max(4, Math.min(256, h))];
+    return [Math.max(4, Math.min(MAX_GRID_SIZE, w)), Math.max(4, Math.min(MAX_GRID_SIZE, h))];
   }
 
   let importedAnimatedFrames = null; // Array de { image: HTMLImageElement, delayMs: number } ou null
@@ -2833,8 +2925,8 @@
   }
 
   document.getElementById('confirmResizeBtn').addEventListener('click', () => {
-    const newW = Math.max(4, Math.min(256, parseInt(document.getElementById('resW').value, 10) || state.gridW));
-    const newH = Math.max(4, Math.min(256, parseInt(document.getElementById('resH').value, 10) || state.gridH));
+    const newW = Math.max(4, Math.min(MAX_GRID_SIZE, parseInt(document.getElementById('resW').value, 10) || state.gridW));
+    const newH = Math.max(4, Math.min(MAX_GRID_SIZE, parseInt(document.getElementById('resH').value, 10) || state.gridH));
     const mode = resMode.value;
 
     stopPlayback();
