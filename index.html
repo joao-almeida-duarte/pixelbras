@@ -138,12 +138,22 @@
     </div>
 
     <!-- Painel Flutuante de Camadas -->
-    <div id="layersPanel" class="hidden absolute top-3 right-3 w-56 bg-zinc-900/95 border border-zinc-700 rounded-xl p-3 shadow-2xl z-20 flex flex-col gap-2 backdrop-blur-sm">
+    <div id="layersPanel" class="hidden absolute top-3 right-3 w-64 bg-zinc-900/95 border border-zinc-700 rounded-xl p-3 shadow-2xl z-20 flex flex-col gap-2 backdrop-blur-sm">
       <div class="flex items-center justify-between border-b border-zinc-800 pb-1.5">
         <span class="text-xs font-bold text-purple-400">Camadas (Quadro #<span id="layerFrameNum">1</span>)</span>
         <div class="flex gap-1">
           <button id="btnAddLayer" class="px-2 py-0.5 rounded bg-purple-600 text-white text-xs font-bold" title="Nova Camada">+ Nova</button>
           <button id="btnCloseLayers" class="px-1.5 text-zinc-400 hover:text-white text-sm">&times;</button>
+        </div>
+      </div>
+      <!-- Barra de Ações Comuns de Camadas -->
+      <div class="flex items-center justify-between gap-1 text-[11px]">
+        <button id="btnLayerMulti" class="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-semibold" title="Ativar Seleção Múltipla (Toque)">Multi</button>
+        <div class="flex items-center gap-1">
+          <button id="btnLayerUp" class="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-zinc-200 font-bold" title="Subir Camada(s)">↑</button>
+          <button id="btnLayerDown" class="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-zinc-200 font-bold" title="Descer Camada(s)">↓</button>
+          <button id="btnLayerClone" class="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-purple-300 font-semibold" title="Clonar Camada(s)">Clonar</button>
+          <button id="btnLayerReverse" class="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-amber-300 font-semibold" title="Espelhar Ordem das Camadas Selecionadas">⇄</button>
         </div>
       </div>
       <div id="layersList" class="flex flex-col gap-1 max-h-48 overflow-y-auto text-xs"></div>
@@ -153,13 +163,17 @@
   <!-- PAINEL DE ANIMAÇÃO (TIMELINE, ONION SKIN, FPS E EXPORTAÇÃO GIF/WEBP ANIMADOS) -->
   <section id="animPanel" class="hidden w-full bg-zinc-900/95 border-t border-zinc-800 px-2.5 py-2 flex flex-col gap-2 shrink-0 z-20">
     <div class="flex flex-wrap items-center justify-between gap-1.5 text-xs">
-      <div class="flex items-center gap-1">
+      <div class="flex flex-wrap items-center gap-1">
         <button id="btnPlayAnim" class="px-2.5 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-zinc-950 font-bold flex items-center gap-1 active:scale-95" title="Reproduzir / Pausar">
           <span id="playIcon">▶ Play</span>
         </button>
         <button id="btnAddFrame" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 font-semibold active:scale-95" title="Novo Quadro Vazio">+ Quadro</button>
-        <button id="btnDupFrame" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 font-semibold active:scale-95" title="Duplicar Quadro Atual">Duplicar</button>
-        <button id="btnDelFrame" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-red-400 font-semibold active:scale-95" title="Excluir Quadro">Excluir</button>
+        <button id="btnFrameMulti" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 font-semibold active:scale-95" title="Seleção Múltipla de Quadros">Multi</button>
+        <button id="btnFrameLeft" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 font-bold active:scale-95" title="Mover Quadro(s) para Esquerda">←</button>
+        <button id="btnFrameRight" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 font-bold active:scale-95" title="Mover Quadro(s) para Direita">→</button>
+        <button id="btnDupFrame" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-orange-300 font-semibold active:scale-95" title="Clonar Quadro ou Grupo Selecionado">Clonar</button>
+        <button id="btnReverseFrames" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-amber-300 font-semibold active:scale-95" title="Espelhar Ordem dos Quadros Selecionados">⇄ Espelhar</button>
+        <button id="btnDelFrame" class="px-2 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-red-400 font-semibold active:scale-95" title="Excluir Quadro(s)">Excluir</button>
       </div>
 
       <div class="flex items-center gap-2">
@@ -1482,21 +1496,101 @@
   });
 
   // =========================================================================
-  // 9. UI DE CAMADAS E TIMELINE DE ANIMAÇÃO (SINCRONIZADAS COM STATE)
+  // 9. MOTOR GENÉRICO DE LISTA (COMUM PARA CAMADAS E QUADROS) + UI
   // =========================================================================
+  const ListManager = {
+    normalizeSelection(selectedSet, fallbackIdx, length) {
+      const valid = [...selectedSet].filter(i => i >= 0 && i < length).sort((a, b) => a - b);
+      return valid.length > 0 ? valid : [Math.max(0, Math.min(fallbackIdx, length - 1))];
+    },
+
+    // Move bloco(s) selecionado(s) para delta (-1 ou +1)
+    move(items, selectedSet, activeIdx, delta) {
+      const sel = this.normalizeSelection(selectedSet, activeIdx, items.length);
+      const nextSet = new Set(sel);
+      let nextActive = activeIdx;
+
+      if (delta < 0) {
+        for (const idx of sel) {
+          if (idx > 0 && !nextSet.has(idx - 1)) {
+            [items[idx - 1], items[idx]] = [items[idx], items[idx - 1]];
+            nextSet.delete(idx);
+            nextSet.add(idx - 1);
+            if (nextActive === idx) nextActive = idx - 1;
+          }
+        }
+      } else if (delta > 0) {
+        for (let i = sel.length - 1; i >= 0; i--) {
+          const idx = sel[i];
+          if (idx < items.length - 1 && !nextSet.has(idx + 1)) {
+            [items[idx + 1], items[idx]] = [items[idx], items[idx + 1]];
+            nextSet.delete(idx);
+            nextSet.add(idx + 1);
+            if (nextActive === idx) nextActive = idx + 1;
+          }
+        }
+      }
+      return { selectedSet: nextSet, activeIdx: nextActive };
+    },
+
+    // Clona item único ou grupo selecionado logo após o último selecionado
+    clone(items, selectedSet, activeIdx, cloneFn) {
+      const sel = this.normalizeSelection(selectedSet, activeIdx, items.length);
+      const insertPos = sel[sel.length - 1] + 1;
+      const clones = sel.map(idx => cloneFn(items[idx], idx));
+      items.splice(insertPos, 0, ...clones);
+      const nextSet = new Set(clones.map((_, offset) => insertPos + offset));
+      return { selectedSet: nextSet, activeIdx: insertPos };
+    },
+
+    // Espelha/Inverte a ordem dos itens selecionados (se < 2 selecionados, inverte a lista inteira)
+    reverse(items, selectedSet, activeIdx) {
+      let sel = this.normalizeSelection(selectedSet, activeIdx, items.length);
+      if (sel.length < 2) {
+        sel = items.map((_, i) => i);
+      }
+      const reversedItems = sel.map(idx => items[idx]).reverse();
+      sel.forEach((targetIdx, i) => {
+        items[targetIdx] = reversedItems[i];
+      });
+      const posInSel = sel.indexOf(activeIdx);
+      const nextActive = posInSel >= 0 ? sel[sel.length - 1 - posInSel] : activeIdx;
+      return { selectedSet: new Set(sel), activeIdx: nextActive };
+    }
+  };
+
+  // Estado de seleção múltipla
+  let selectedLayers = new Set([0]);
+  let layerMultiMode = false;
+  let selectedFrames = new Set([0]);
+  let frameMultiMode = false;
+
   const layersPanel = document.getElementById('layersPanel');
   const layersList = document.getElementById('layersList');
 
   function renderLayersUI() {
     const fr = getActiveFrame();
     document.getElementById('layerFrameNum').textContent = `${state.activeFrameIdx + 1}`;
+    // Garante que a camada ativa sempre esteja incluída na seleção
+    selectedLayers = new Set(ListManager.normalizeSelection(selectedLayers, fr.activeLayerIdx, fr.layers.length));
+    selectedLayers.add(fr.activeLayerIdx);
+
+    const multiBtn = document.getElementById('btnLayerMulti');
+    multiBtn.classList.toggle('border-purple-500', layerMultiMode);
+    multiBtn.classList.toggle('text-purple-300', layerMultiMode);
+
     layersList.innerHTML = '';
 
     for (let i = fr.layers.length - 1; i >= 0; i--) {
       const l = fr.layers[i];
       const isActive = i === fr.activeLayerIdx;
+      const isInGroup = selectedLayers.has(i);
       const row = document.createElement('div');
-      row.className = `flex items-center justify-between p-1.5 rounded-lg border cursor-pointer ${isActive ? 'bg-purple-950/60 border-purple-500 text-white' : 'bg-zinc-800/80 border-zinc-700 text-zinc-400'}`;
+      row.className = `flex items-center justify-between p-1.5 rounded-lg border cursor-pointer ${
+        isActive ? 'bg-purple-950/70 border-purple-500 text-white' :
+        isInGroup ? 'bg-purple-900/30 border-purple-700/70 text-purple-200' :
+        'bg-zinc-800/80 border-zinc-700 text-zinc-400'
+      }`;
       row.innerHTML = `
         <div class="flex items-center gap-1.5 truncate flex-1" data-select="${i}">
           <button class="text-xs px-1 hover:text-white" data-vis="${i}" title="Mostrar/Ocultar">${l.visible ? '👁️' : '🚫'}</button>
@@ -1508,9 +1602,21 @@
     }
 
     layersList.querySelectorAll('[data-select]').forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', e => {
         commitSelection();
-        fr.activeLayerIdx = parseInt(el.dataset.select, 10);
+        const idx = parseInt(el.dataset.select, 10);
+        if (layerMultiMode || e.ctrlKey || e.metaKey || e.shiftKey) {
+          if (selectedLayers.has(idx) && selectedLayers.size > 1) {
+            selectedLayers.delete(idx);
+            if (fr.activeLayerIdx === idx) fr.activeLayerIdx = [...selectedLayers][0];
+          } else {
+            selectedLayers.add(idx);
+            fr.activeLayerIdx = idx;
+          }
+        } else {
+          selectedLayers = new Set([idx]);
+          fr.activeLayerIdx = idx;
+        }
         renderLayersUI();
         updateStatus(lastX, lastY);
       });
@@ -1535,10 +1641,61 @@
         const idx = parseInt(el.dataset.del, 10);
         fr.layers.splice(idx, 1);
         fr.activeLayerIdx = Math.max(0, Math.min(fr.activeLayerIdx, fr.layers.length - 1));
+        selectedLayers = new Set([fr.activeLayerIdx]);
         refreshAllUI();
       });
     });
   }
+
+  document.getElementById('btnLayerMulti').addEventListener('click', () => {
+    layerMultiMode = !layerMultiMode;
+    if (!layerMultiMode) selectedLayers = new Set([getActiveFrame().activeLayerIdx]);
+    renderLayersUI();
+  });
+
+  // Nota: Na UI as camadas são exibidas do topo (índice maior) para baixo (índice 0)
+  document.getElementById('btnLayerUp').addEventListener('click', () => {
+    commitSelection();
+    saveState();
+    const fr = getActiveFrame();
+    const res = ListManager.move(fr.layers, selectedLayers, fr.activeLayerIdx, +1);
+    selectedLayers = res.selectedSet;
+    fr.activeLayerIdx = res.activeIdx;
+    refreshAllUI();
+  });
+
+  document.getElementById('btnLayerDown').addEventListener('click', () => {
+    commitSelection();
+    saveState();
+    const fr = getActiveFrame();
+    const res = ListManager.move(fr.layers, selectedLayers, fr.activeLayerIdx, -1);
+    selectedLayers = res.selectedSet;
+    fr.activeLayerIdx = res.activeIdx;
+    refreshAllUI();
+  });
+
+  document.getElementById('btnLayerClone').addEventListener('click', () => {
+    commitSelection();
+    saveState();
+    const fr = getActiveFrame();
+    const res = ListManager.clone(fr.layers, selectedLayers, fr.activeLayerIdx, l => {
+      state.layerCounter++;
+      return { id: state.layerCounter, name: `${l.name} (cópia)`, visible: l.visible, data: new Uint8Array(l.data) };
+    });
+    selectedLayers = res.selectedSet;
+    fr.activeLayerIdx = res.activeIdx;
+    refreshAllUI();
+  });
+
+  document.getElementById('btnLayerReverse').addEventListener('click', () => {
+    commitSelection();
+    saveState();
+    const fr = getActiveFrame();
+    const res = ListManager.reverse(fr.layers, selectedLayers, fr.activeLayerIdx);
+    selectedLayers = res.selectedSet;
+    fr.activeLayerIdx = res.activeIdx;
+    refreshAllUI();
+  });
 
   document.getElementById('btnToggleLayers').addEventListener('click', () => {
     renderLayersUI();
@@ -1558,6 +1715,7 @@
       data: new Uint8Array(state.gridW * state.gridH * 4)
     });
     fr.activeLayerIdx = fr.layers.length - 1;
+    selectedLayers = new Set([fr.activeLayerIdx]);
     refreshAllUI();
   });
 
@@ -1576,26 +1734,50 @@
   }
 
   function renderFramesUI() {
+    selectedFrames = new Set(ListManager.normalizeSelection(selectedFrames, state.activeFrameIdx, state.frames.length));
+    selectedFrames.add(state.activeFrameIdx);
+
+    const multiBtn = document.getElementById('btnFrameMulti');
+    multiBtn.classList.toggle('border-orange-500', frameMultiMode);
+    multiBtn.classList.toggle('text-orange-400', frameMultiMode);
+
     framesList.innerHTML = '';
     state.frames.forEach((fr, idx) => {
       const isSelected = idx === state.activeFrameIdx;
+      const isInGroup = selectedFrames.has(idx);
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = `relative flex flex-col items-center p-1 rounded-lg border shrink-0 transition ${isSelected ? 'border-orange-500 bg-orange-950/40' : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'}`;
+      card.className = `relative flex flex-col items-center p-1 rounded-lg border shrink-0 transition ${
+        isSelected ? 'border-orange-500 bg-orange-950/50' :
+        isInGroup ? 'border-amber-500/80 bg-amber-950/30' :
+        'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'
+      }`;
 
       const thumb = renderFrameToCanvas2D(idx);
       thumb.className = 'w-11 h-11 rounded bg-zinc-950 border border-zinc-800';
 
       const badge = document.createElement('span');
-      badge.className = `text-[10px] font-mono mt-0.5 ${isSelected ? 'text-orange-400 font-bold' : 'text-zinc-400'}`;
+      badge.className = `text-[10px] font-mono mt-0.5 ${isSelected ? 'text-orange-400 font-bold' : isInGroup ? 'text-amber-300' : 'text-zinc-400'}`;
       badge.textContent = `#${idx + 1}`;
 
       card.appendChild(thumb);
       card.appendChild(badge);
-      card.addEventListener('click', () => {
+      card.addEventListener('click', e => {
         stopPlayback();
         commitSelection();
-        state.activeFrameIdx = idx;
+        if (frameMultiMode || e.ctrlKey || e.metaKey || e.shiftKey) {
+          if (selectedFrames.has(idx) && selectedFrames.size > 1) {
+            selectedFrames.delete(idx);
+            if (state.activeFrameIdx === idx) state.activeFrameIdx = [...selectedFrames][0];
+          } else {
+            selectedFrames.add(idx);
+            state.activeFrameIdx = idx;
+          }
+        } else {
+          selectedFrames = new Set([idx]);
+          state.activeFrameIdx = idx;
+        }
+        selectedLayers = new Set([getActiveFrame().activeLayerIdx]);
         refreshAllUI();
       });
       framesList.appendChild(card);
@@ -1608,6 +1790,32 @@
     render();
     updateStatus(lastX, lastY);
   }
+
+  document.getElementById('btnFrameMulti').addEventListener('click', () => {
+    frameMultiMode = !frameMultiMode;
+    if (!frameMultiMode) selectedFrames = new Set([state.activeFrameIdx]);
+    renderFramesUI();
+  });
+
+  document.getElementById('btnFrameLeft').addEventListener('click', () => {
+    stopPlayback();
+    commitSelection();
+    saveState();
+    const res = ListManager.move(state.frames, selectedFrames, state.activeFrameIdx, -1);
+    selectedFrames = res.selectedSet;
+    state.activeFrameIdx = res.activeIdx;
+    refreshAllUI();
+  });
+
+  document.getElementById('btnFrameRight').addEventListener('click', () => {
+    stopPlayback();
+    commitSelection();
+    saveState();
+    const res = ListManager.move(state.frames, selectedFrames, state.activeFrameIdx, +1);
+    selectedFrames = res.selectedSet;
+    state.activeFrameIdx = res.activeIdx;
+    refreshAllUI();
+  });
 
   document.getElementById('btnToggleAnim').addEventListener('click', () => {
     animPanel.classList.toggle('hidden');
@@ -1627,6 +1835,8 @@
     };
     state.frames.splice(state.activeFrameIdx + 1, 0, newFrame);
     state.activeFrameIdx++;
+    selectedFrames = new Set([state.activeFrameIdx]);
+    selectedLayers = new Set([0]);
     refreshAllUI();
   });
 
@@ -1634,25 +1844,43 @@
     stopPlayback();
     commitSelection();
     saveState();
-    const curFr = getActiveFrame();
-    state.frameCounter++;
-    const dupFrame = {
-      id: state.frameCounter,
-      activeLayerIdx: curFr.activeLayerIdx,
-      layers: curFr.layers.map(l => ({ id: l.id, name: l.name, visible: l.visible, data: new Uint8Array(l.data) }))
-    };
-    state.frames.splice(state.activeFrameIdx + 1, 0, dupFrame);
-    state.activeFrameIdx++;
+    const res = ListManager.clone(state.frames, selectedFrames, state.activeFrameIdx, fr => {
+      state.frameCounter++;
+      return {
+        id: state.frameCounter,
+        activeLayerIdx: fr.activeLayerIdx,
+        layers: fr.layers.map(l => ({ id: l.id, name: l.name, visible: l.visible, data: new Uint8Array(l.data) }))
+      };
+    });
+    selectedFrames = res.selectedSet;
+    state.activeFrameIdx = res.activeIdx;
+    selectedLayers = new Set([getActiveFrame().activeLayerIdx]);
+    refreshAllUI();
+  });
+
+  document.getElementById('btnReverseFrames').addEventListener('click', () => {
+    stopPlayback();
+    commitSelection();
+    saveState();
+    const res = ListManager.reverse(state.frames, selectedFrames, state.activeFrameIdx);
+    selectedFrames = res.selectedSet;
+    state.activeFrameIdx = res.activeIdx;
+    selectedLayers = new Set([getActiveFrame().activeLayerIdx]);
     refreshAllUI();
   });
 
   document.getElementById('btnDelFrame').addEventListener('click', () => {
-    if (state.frames.length <= 1) return alert('A animação precisa ter pelo menos 1 quadro.');
+    const toDelete = ListManager.normalizeSelection(selectedFrames, state.activeFrameIdx, state.frames.length);
+    if (state.frames.length - toDelete.length < 1) return alert('A animação precisa ter pelo menos 1 quadro.');
     stopPlayback();
     commitSelection();
     saveState();
-    state.frames.splice(state.activeFrameIdx, 1);
-    state.activeFrameIdx = Math.max(0, state.activeFrameIdx - 1);
+    for (let i = toDelete.length - 1; i >= 0; i--) {
+      state.frames.splice(toDelete[i], 1);
+    }
+    state.activeFrameIdx = Math.max(0, Math.min(toDelete[0], state.frames.length - 1));
+    selectedFrames = new Set([state.activeFrameIdx]);
+    selectedLayers = new Set([getActiveFrame().activeLayerIdx]);
     refreshAllUI();
   });
 
