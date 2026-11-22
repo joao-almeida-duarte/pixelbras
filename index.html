@@ -85,6 +85,10 @@
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 22a5 5 0 0 1-2-4"/><path d="M3.3 14A6.8 6.8 0 0 1 2 10c0-4.4 4.5-8 10-8s10 3.6 10 8-4.5 8-10 8a12 12 0 0 1-5-1"/><path d="M5 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
       </button>
 
+      <button id="tool-selbrush" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-emerald-300 shrink-0" title="Seleção em Pincel (S)">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2"><circle cx="12" cy="12" r="7"/><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+
       <button id="tool-eraser" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Borracha Transparente (E)">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
       </button>
@@ -117,11 +121,15 @@
   </header>
 
   <!-- Barra Contextual de Seleção -->
-  <div id="selectionBar" class="hidden w-full bg-emerald-950/90 border-b border-emerald-700/60 px-3 py-1.5 flex items-center justify-between text-xs z-10">
-    <span class="text-emerald-300 font-medium">Arraste para mover a seleção</span>
-    <div class="flex gap-1.5">
+  <div id="selectionBar" class="hidden w-full bg-emerald-950/95 border-b border-emerald-700/60 px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-1.5 text-xs z-10">
+    <div class="flex items-center gap-1">
+      <button data-selmode="replace" class="sel-mode-btn px-2 py-1 rounded bg-emerald-600 text-zinc-950 font-bold">Nova</button>
+      <button data-selmode="add" class="sel-mode-btn px-2 py-1 rounded bg-zinc-800 border border-emerald-600/50 text-emerald-300 font-semibold">+ Adicionar</button>
+      <button data-selmode="sub" class="sel-mode-btn px-2 py-1 rounded bg-zinc-800 border border-amber-600/50 text-amber-300 font-semibold">- Remover</button>
+    </div>
+    <div class="flex items-center gap-1.5">
       <button id="btnSelDelete" class="px-2 py-1 rounded bg-red-900/80 text-red-200 font-semibold">Apagar</button>
-      <button id="btnSelCommit" class="px-2 py-1 rounded bg-emerald-600 text-zinc-950 font-bold">Fixar</button>
+      <button id="btnSelCommit" class="px-2.5 py-1 rounded bg-emerald-500 text-zinc-950 font-bold">Fixar</button>
     </div>
   </div>
 
@@ -492,10 +500,11 @@
     uniform sampler2D u_tex;
     uniform sampler2D u_prevTex;
     uniform sampler2D u_nextTex;
+    uniform sampler2D u_selMask;
+    uniform float u_hasSelMask;
     uniform float u_onionSkin;
     uniform vec2 u_gridSize;
     uniform float u_showGrid;
-    uniform vec4 u_selRect;
 
     void main() {
       vec2 pixelCoord = v_uv * u_gridSize;
@@ -527,20 +536,22 @@
         finalColor = mix(finalColor, vec3(0.32, 0.32, 0.36), min(line, 1.0) * 0.45);
       }
 
-      if (u_selRect.z > 0.0 && u_selRect.w > 0.0) {
-        bool insideX = cell.x >= u_selRect.x && cell.x < (u_selRect.x + u_selRect.z);
-        bool insideY = cell.y >= u_selRect.y && cell.y < (u_selRect.y + u_selRect.w);
-        if (insideX && insideY) {
-          // Realce sutil dentro da área selecionada
-          finalColor = mix(finalColor, vec3(0.02, 0.83, 0.38), 0.12);
-          bool border = (cell.x == u_selRect.x || cell.x == u_selRect.x + u_selRect.z - 1.0 ||
-                         cell.y == u_selRect.y || cell.y == u_selRect.y + u_selRect.w - 1.0);
+      if (u_hasSelMask > 0.5) {
+        vec2 texel = 1.0 / u_gridSize;
+        float mCenter = texture2D(u_selMask, (cell + 0.5) * texel).a;
+        if (mCenter > 0.5) {
+          finalColor = mix(finalColor, vec3(0.02, 0.83, 0.38), 0.16);
+          float mLeft  = cell.x > 0.0 ? texture2D(u_selMask, (cell + vec2(-0.5, 0.5)) * texel).a : 0.0;
+          float mRight = cell.x < (u_gridSize.x - 1.0) ? texture2D(u_selMask, (cell + vec2(1.5, 0.5)) * texel).a : 0.0;
+          float mUp    = cell.y > 0.0 ? texture2D(u_selMask, (cell + vec2(0.5, -0.5)) * texel).a : 0.0;
+          float mDown  = cell.y < (u_gridSize.y - 1.0) ? texture2D(u_selMask, (cell + vec2(0.5, 1.5)) * texel).a : 0.0;
+
           vec2 f = fract(pixelCoord);
-          bool edge = (cell.x == u_selRect.x && f.x < 0.22) ||
-                      (cell.x == u_selRect.x + u_selRect.z - 1.0 && f.x > 0.78) ||
-                      (cell.y == u_selRect.y && f.y < 0.22) ||
-                      (cell.y == u_selRect.y + u_selRect.w - 1.0 && f.y > 0.78);
-          if (border && edge) {
+          bool edge = (mLeft < 0.5 && f.x < 0.22) ||
+                      (mRight < 0.5 && f.x > 0.78) ||
+                      (mUp < 0.5 && f.y < 0.22) ||
+                      (mDown < 0.5 && f.y > 0.78);
+          if (edge) {
             float dash = mod(floor(pixelCoord.x * 4.0) + floor(pixelCoord.y * 4.0), 2.0);
             finalColor = mix(vec3(0.02, 0.83, 0.38), vec3(1.0), dash);
           }
@@ -573,11 +584,12 @@
 
   const uGridSizeLoc = gl.getUniformLocation(prog, 'u_gridSize');
   const uShowGridLoc = gl.getUniformLocation(prog, 'u_showGrid');
-  const uSelRectLoc = gl.getUniformLocation(prog, 'u_selRect');
+  const uHasSelMaskLoc = gl.getUniformLocation(prog, 'u_hasSelMask');
   const uOnionSkinLoc = gl.getUniformLocation(prog, 'u_onionSkin');
   gl.uniform1i(gl.getUniformLocation(prog, 'u_tex'), 0);
   gl.uniform1i(gl.getUniformLocation(prog, 'u_prevTex'), 1);
   gl.uniform1i(gl.getUniformLocation(prog, 'u_nextTex'), 2);
+  gl.uniform1i(gl.getUniformLocation(prog, 'u_selMask'), 3);
 
   function createPixelTex(unit) {
     gl.activeTexture(gl.TEXTURE0 + unit);
@@ -592,6 +604,7 @@
   const tex = createPixelTex(0);
   const prevTex = createPixelTex(1);
   const nextTex = createPixelTex(2);
+  const selMaskTex = createPixelTex(3);
 
   // =========================================================================
   // 3. HISTÓRICO UNDO / REDO UNIFICADO
@@ -704,7 +717,9 @@
       const sel = state.selection;
       for (let sy = 0; sy < sel.h; sy++) {
         for (let sx = 0; sx < sel.w; sx++) {
-          const sIdx = (sy * sel.w + sx) * 4;
+          const mIdx = sy * sel.w + sx;
+          if (!sel.mask[mIdx]) continue;
+          const sIdx = mIdx * 4;
           if (sel.data[sIdx + 3] > 0) {
             setPixelRaw(comp, state.gridW, state.gridH, sel.x + sx, sel.y + sy, [
               sel.data[sIdx], sel.data[sIdx+1], sel.data[sIdx+2], sel.data[sIdx+3]
@@ -717,19 +732,46 @@
     return comp;
   }
 
-  function render(overrideActiveLayerData = null, tempSelRect = null) {
+  function buildFullGridMaskTexture(previewMask = null) {
+    const maskTexBuf = new Uint8Array(state.gridW * state.gridH * 4);
+    let hasAny = false;
+    if (state.selection) {
+      const sel = state.selection;
+      for (let sy = 0; sy < sel.h; sy++) {
+        for (let sx = 0; sx < sel.w; sx++) {
+          if (!sel.mask[sy * sel.w + sx]) continue;
+          const gx = sel.x + sx, gy = sel.y + sy;
+          if (gx >= 0 && gx < state.gridW && gy >= 0 && gy < state.gridH) {
+            maskTexBuf[(gy * state.gridW + gx) * 4 + 3] = 255;
+            hasAny = true;
+          }
+        }
+      }
+    }
+    if (previewMask) {
+      for (let i = 0; i < previewMask.length; i++) {
+        if (previewMask[i]) {
+          maskTexBuf[i * 4 + 3] = 255;
+          hasAny = true;
+        }
+      }
+    }
+    return { buf: maskTexBuf, hasAny };
+  }
+
+  function render(overrideActiveLayerData = null, previewMask = null) {
     const bufToDraw = getCompositeBuffer(overrideActiveLayerData, state.activeFrameIdx);
     gl.uniform2f(uGridSizeLoc, state.gridW, state.gridH);
     gl.uniform1f(uShowGridLoc, state.showGrid ? 1.0 : 0.0);
     const showOnion = (state.onionSkin && !state.isPlaying && state.frames.length > 1) ? 1.0 : 0.0;
     gl.uniform1f(uOnionSkinLoc, showOnion);
 
-    if (tempSelRect) {
-      gl.uniform4f(uSelRectLoc, tempSelRect.x, tempSelRect.y, tempSelRect.w, tempSelRect.h);
-    } else if (state.selection) {
-      gl.uniform4f(uSelRectLoc, state.selection.x, state.selection.y, state.selection.w, state.selection.h);
-    } else {
-      gl.uniform4f(uSelRectLoc, 0, 0, -1, -1);
+    const maskInfo = buildFullGridMaskTexture(previewMask);
+    gl.uniform1f(uHasSelMaskLoc, maskInfo.hasAny ? 1.0 : 0.0);
+    if (maskInfo.hasAny) {
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, selMaskTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, maskInfo.buf);
     }
 
     gl.activeTexture(gl.TEXTURE0);
@@ -869,19 +911,36 @@
   }
 
   // =========================================================================
-  // 6. SELEÇÃO FLUTUANTE (RETANGULAR E LAÇO LIVRE)
+  // 6. SELEÇÃO FLUTUANTE ARBÍTRARIA (RETÂNGULO, LAÇO, PINCEL + ADICIONAR/REMOVER)
   // =========================================================================
   let selDragging = false;
   let selDragOffset = [0, 0];
   let selCreating = false;
-  let lassoPoints = []; // Pontos [x, y] do traçado do laço
+  let selectionMode = 'replace'; // 'replace' | 'add' | 'sub'
+  let lassoPoints = [];
+  let draftSelMask = null; // Uint8Array(gridW * gridH) durante o traçado
 
   function isSelectionTool(t) {
-    return t === 'select' || t === 'lasso';
+    return t === 'select' || t === 'lasso' || t === 'selbrush';
   }
 
+  function setSelectionMode(mode) {
+    selectionMode = mode;
+    document.querySelectorAll('.sel-mode-btn').forEach(btn => {
+      const active = btn.dataset.selmode === mode;
+      btn.className = active
+        ? 'sel-mode-btn px-2 py-1 rounded bg-emerald-500 text-zinc-950 font-bold'
+        : 'sel-mode-btn px-2 py-1 rounded bg-zinc-800 border border-zinc-600 text-zinc-200 font-semibold';
+    });
+  }
+
+  document.querySelectorAll('.sel-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => setSelectionMode(btn.dataset.selmode));
+  });
+
   function updateSelectionBar() {
-    document.getElementById('selectionBar').classList.toggle('hidden', !state.selection);
+    const visible = Boolean(state.selection) || isSelectionTool(state.currentTool);
+    document.getElementById('selectionBar').classList.toggle('hidden', !visible);
   }
 
   function commitSelection() {
@@ -890,7 +949,9 @@
     const targetBuf = getActivePixels();
     for (let sy = 0; sy < sel.h; sy++) {
       for (let sx = 0; sx < sel.w; sx++) {
-        const sIdx = (sy * sel.w + sx) * 4;
+        const mIdx = sy * sel.w + sx;
+        if (!sel.mask[mIdx]) continue;
+        const sIdx = mIdx * 4;
         if (sel.data[sIdx + 3] > 0) {
           setPixelRaw(targetBuf, state.gridW, state.gridH, sel.x + sx, sel.y + sy, [
             sel.data[sIdx], sel.data[sIdx+1], sel.data[sIdx+2], sel.data[sIdx+3]
@@ -903,7 +964,87 @@
     render();
   }
 
-  // Algoritmo Ray-Casting (Ponto dentro do polígono do Laço)
+  // Aplica operação booleana (replace, add, sub) entre a seleção atual e a nova máscara recortada
+  function applySelectionMask(newMask) {
+    const activeBuf = getActivePixels();
+
+    // Se havia seleção flutuante, devolve os pixels ao buffer temporariamente para recalcular a união/subtração limpa
+    const prevFullMask = new Uint8Array(state.gridW * state.gridH);
+    if (state.selection) {
+      const sel = state.selection;
+      for (let sy = 0; sy < sel.h; sy++) {
+        for (let sx = 0; sx < sel.w; sx++) {
+          const mIdx = sy * sel.w + sx;
+          if (!sel.mask[mIdx]) continue;
+          const gx = sel.x + sx, gy = sel.y + sy;
+          if (gx >= 0 && gx < state.gridW && gy >= 0 && gy < state.gridH) {
+            prevFullMask[gy * state.gridW + gx] = 1;
+            const sIdx = mIdx * 4;
+            if (sel.data[sIdx + 3] > 0) {
+              setPixelRaw(activeBuf, state.gridW, state.gridH, gx, gy, [
+                sel.data[sIdx], sel.data[sIdx+1], sel.data[sIdx+2], sel.data[sIdx+3]
+              ]);
+            }
+          }
+        }
+      }
+    }
+
+    const combinedMask = new Uint8Array(state.gridW * state.gridH);
+    let minX = state.gridW, minY = state.gridH, maxX = -1, maxY = -1;
+
+    for (let y = 0; y < state.gridH; y++) {
+      for (let x = 0; x < state.gridW; x++) {
+        const idx = y * state.gridW + x;
+        let selected = false;
+        if (selectionMode === 'add') {
+          selected = Boolean(prevFullMask[idx] || newMask[idx]);
+        } else if (selectionMode === 'sub') {
+          selected = Boolean(prevFullMask[idx] && !newMask[idx]);
+        } else {
+          selected = Boolean(newMask[idx]);
+        }
+        if (selected) {
+          combinedMask[idx] = 1;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    if (maxX < minX || maxY < minY) {
+      state.selection = null;
+      updateSelectionBar();
+      render();
+      return;
+    }
+
+    const w = maxX - minX + 1, h = maxY - minY + 1;
+    const selData = new Uint8Array(w * h * 4);
+    const selMask = new Uint8Array(w * h);
+
+    for (let sy = 0; sy < h; sy++) {
+      for (let sx = 0; sx < w; sx++) {
+        const gx = minX + sx, gy = minY + sy;
+        const gIdx = gy * state.gridW + gx;
+        if (combinedMask[gIdx]) {
+          const mIdx = sy * w + sx;
+          selMask[mIdx] = 1;
+          const p = getPixel(activeBuf, state.gridW, gx, gy);
+          const dIdx = mIdx * 4;
+          selData[dIdx] = p[0]; selData[dIdx+1] = p[1]; selData[dIdx+2] = p[2]; selData[dIdx+3] = p[3];
+          setPixelRaw(activeBuf, state.gridW, state.gridH, gx, gy, [0, 0, 0, 0]);
+        }
+      }
+    }
+
+    state.selection = { x: minX, y: minY, w, h, data: selData, mask: selMask };
+    updateSelectionBar();
+    render();
+  }
+
   function pointInPolygon(px, py, poly) {
     let inside = false;
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -916,9 +1057,34 @@
     return inside;
   }
 
-  document.getElementById('btnSelCommit').addEventListener('click', commitSelection);
+  function stampBrushOnMask(maskArr, cx, cy) {
+    const tempRGBA = new Uint8Array(state.gridW * state.gridH * 4);
+    setPixel(tempRGBA, state.gridW, state.gridH, cx, cy, [255, 255, 255, 255], state.brushSize);
+    for (let i = 0; i < maskArr.length; i++) {
+      if (tempRGBA[i * 4 + 3] > 0) maskArr[i] = 1;
+    }
+  }
+
+  function drawLineOnMask(maskArr, x0, y0, x1, y1) {
+    let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    while (true) {
+      stampBrushOnMask(maskArr, x0, y0);
+      if (x0 === x1 && y0 === y1) break;
+      let e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+  }
+
+  document.getElementById('btnSelCommit').addEventListener('click', () => {
+    commitSelection();
+    setSelectionMode('replace');
+  });
   document.getElementById('btnSelDelete').addEventListener('click', () => {
     state.selection = null;
+    setSelectionMode('replace');
     updateSelectionBar();
     render();
   });
@@ -926,22 +1092,26 @@
   // =========================================================================
   // 7. INTERAÇÃO MOUSE & TOUCH (COM PROTEÇÃO DE 2 DEDOS)
   // =========================================================================
-  const tools = ['brush', 'bucket', 'picker', 'line', 'rect', 'select', 'lasso', 'eraser', 'magic'];
+  const tools = ['brush', 'bucket', 'picker', 'line', 'rect', 'select', 'lasso', 'selbrush', 'eraser', 'magic'];
   const brushPanel = document.getElementById('brushPanel');
 
   function selectTool(name) {
-    if (isSelectionTool(state.currentTool) && !isSelectionTool(name)) commitSelection();
+    if (isSelectionTool(state.currentTool) && !isSelectionTool(name)) {
+      commitSelection();
+      setSelectionMode('replace');
+    }
     state.currentTool = name;
     tools.forEach(t => document.getElementById(`tool-${t}`).classList.toggle('active', t === name));
+    updateSelectionBar();
   }
 
   tools.forEach(t => {
     document.getElementById(`tool-${t}`).addEventListener('click', () => {
-      if (t === 'brush' && state.currentTool === 'brush') {
+      if ((t === 'brush' && state.currentTool === 'brush') || (t === 'selbrush' && state.currentTool === 'selbrush')) {
         brushPanel.classList.toggle('hidden');
         return;
       }
-      if (t !== 'brush') brushPanel.classList.add('hidden');
+      if (t !== 'brush' && t !== 'selbrush') brushPanel.classList.add('hidden');
       selectTool(t);
     });
   });
@@ -964,6 +1134,14 @@
     document.getElementById('statusText').textContent = `${state.gridW}x${state.gridH} | ${layer.name} | ${x}, ${y}`;
   }
 
+  function isPointInsideActiveSelection(x, y) {
+    const sel = state.selection;
+    if (!sel) return false;
+    const sx = x - sel.x, sy = y - sel.y;
+    if (sx < 0 || sx >= sel.w || sy < 0 || sy >= sel.h) return false;
+    return sel.mask[sy * sel.w + sx] === 1;
+  }
+
   function handleStart(clientX, clientY) {
     stopPlayback();
     const [x, y] = getCoords(clientX, clientY);
@@ -977,22 +1155,31 @@
     updateStatus(x, y);
 
     if (isSelectionTool(state.currentTool)) {
-      const sel = state.selection;
-      if (sel && x >= sel.x && x < sel.x + sel.w && y >= sel.y && y < sel.y + sel.h) {
+      // Só arrasta se estiver no modo 'replace' (Nova) e tocar dentro da forma exata já selecionada
+      if (selectionMode === 'replace' && isPointInsideActiveSelection(x, y)) {
         selDragging = true;
-        selDragOffset = [x - sel.x, y - sel.y];
+        selDragOffset = [x - state.selection.x, y - state.selection.y];
         return;
       }
-      commitSelection();
+
+      if (selectionMode === 'replace') commitSelection();
       selCreating = true;
       startX = x; startY = y;
-      lassoPoints = [[x, y]];
-      render(null, { x, y, w: 1, h: 1 });
+      draftSelMask = new Uint8Array(state.gridW * state.gridH);
+
+      if (state.currentTool === 'lasso') {
+        lassoPoints = [[x, y]];
+        draftSelMask[y * state.gridW + x] = 1;
+      } else if (state.currentTool === 'selbrush') {
+        stampBrushOnMask(draftSelMask, x, y);
+      } else {
+        draftSelMask[y * state.gridW + x] = 1;
+      }
+      render(null, draftSelMask);
       return;
     }
 
     if (state.currentTool === 'picker') {
-      // Captura cor visível da composição atual (ou da camada ativa se tiver pixel)
       const comp = getCompositeBuffer();
       const picked = getPixel(comp, state.gridW, x, y);
       if (picked[3] > 0) {
@@ -1038,27 +1225,38 @@
         state.selection.x = x - selDragOffset[0];
         state.selection.y = y - selDragOffset[1];
         render();
-      } else if (selCreating) {
+      } else if (selCreating && draftSelMask) {
         if (state.currentTool === 'lasso') {
           const prevPt = lassoPoints[lassoPoints.length - 1];
           if (!prevPt || prevPt[0] !== x || prevPt[1] !== y) {
             lassoPoints.push([x, y]);
+            // Desenha apenas o contorno livre fino na máscara de pré-visualização
+            let dx = Math.abs(x - prevPt[0]), sx = prevPt[0] < x ? 1 : -1;
+            let dy = -Math.abs(y - prevPt[1]), sy = prevPt[1] < y ? 1 : -1;
+            let err = dx + dy, cx = prevPt[0], cy = prevPt[1];
+            while (true) {
+              draftSelMask[cy * state.gridW + cx] = 1;
+              if (cx === x && cy === y) break;
+              let e2 = 2 * err;
+              if (e2 >= dy) { err += dy; cx += sx; }
+              if (e2 <= dx) { err += dx; cy += sy; }
+            }
           }
-          // Mostra pré-visualização da linha do laço e bounding box
-          const preview = new Uint8Array(getActivePixels());
-          let minX = state.gridW, minY = state.gridH, maxX = 0, maxY = 0;
-          for (let i = 0; i < lassoPoints.length; i++) {
-            const [lx, ly] = lassoPoints[i];
-            if (lx < minX) minX = lx; if (lx > maxX) maxX = lx;
-            if (ly < minY) minY = ly; if (ly > maxY) maxY = ly;
-            if (i > 0) drawLine(preview, lassoPoints[i-1][0], lassoPoints[i-1][1], lx, ly, [4, 211, 97, 255], 1);
-            else setPixelRaw(preview, state.gridW, state.gridH, lx, ly, [4, 211, 97, 255]);
-          }
-          render(preview, { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 });
+          render(null, draftSelMask);
+        } else if (state.currentTool === 'selbrush') {
+          drawLineOnMask(draftSelMask, startX, startY, x, y);
+          startX = x; startY = y;
+          render(null, draftSelMask);
         } else {
-          const minX = Math.min(startX, x), minY = Math.min(startY, y);
-          const w = Math.abs(x - startX) + 1, h = Math.abs(y - startY) + 1;
-          render(null, { x: minX, y: minY, w, h });
+          draftSelMask.fill(0);
+          const minX = Math.min(startX, x), maxX = Math.max(startX, x);
+          const minY = Math.min(startY, y), maxY = Math.max(startY, y);
+          for (let py = minY; py <= maxY; py++) {
+            for (let px = minX; px <= maxX; px++) {
+              draftSelMask[py * state.gridW + px] = 1;
+            }
+          }
+          render(null, draftSelMask);
         }
       }
       return;
@@ -1089,78 +1287,35 @@
         selDragging = false;
         return;
       }
-      if (selCreating) {
+      if (selCreating && draftSelMask) {
         selCreating = false;
-        const activeBuf = getActivePixels();
+        saveState();
 
         if (state.currentTool === 'lasso' && lassoPoints.length >= 3) {
-          let minX = state.gridW, minY = state.gridH, maxX = 0, maxY = 0;
-          // Marca borda do laço em uma máscara auxiliar
-          const borderMask = new Uint8Array(state.gridW * state.gridH);
-          for (let i = 0; i < lassoPoints.length; i++) {
-            const [lx, ly] = lassoPoints[i];
-            const [nx, ny] = lassoPoints[(i + 1) % lassoPoints.length];
-            if (lx < minX) minX = lx; if (lx > maxX) maxX = lx;
-            if (ly < minY) minY = ly; if (ly > maxY) maxY = ly;
-            // Marca pontos da linha do polígono
-            let dx = Math.abs(nx - lx), sx = lx < nx ? 1 : -1;
-            let dy = -Math.abs(ny - ly), sy = ly < ny ? 1 : -1;
-            let err = dx + dy, cx = lx, cy = ly;
-            while (true) {
-              borderMask[cy * state.gridW + cx] = 1;
-              if (cx === nx && cy === ny) break;
-              let e2 = 2 * err;
-              if (e2 >= dy) { err += dy; cx += sx; }
-              if (e2 <= dx) { err += dx; cy += sy; }
-            }
+          // Fecha o polígono ligando o último ponto ao primeiro e preenche o interior
+          const first = lassoPoints[0], last = lassoPoints[lassoPoints.length - 1];
+          let dx = Math.abs(first[0] - last[0]), sx = last[0] < first[0] ? 1 : -1;
+          let dy = -Math.abs(first[1] - last[1]), sy = last[1] < first[1] ? 1 : -1;
+          let err = dx + dy, cx = last[0], cy = last[1];
+          while (true) {
+            draftSelMask[cy * state.gridW + cx] = 1;
+            if (cx === first[0] && cy === first[1]) break;
+            let e2 = 2 * err;
+            if (e2 >= dy) { err += dy; cx += sx; }
+            if (e2 <= dx) { err += dx; cy += sy; }
           }
-
-          const w = maxX - minX + 1, h = maxY - minY + 1;
-          saveState();
-          const selData = new Uint8Array(w * h * 4);
-          let hasAnyPixel = false;
-
-          for (let sy = 0; sy < h; sy++) {
-            for (let sx = 0; sx < w; sx++) {
-              const gx = minX + sx, gy = minY + sy;
-              if (borderMask[gy * state.gridW + gx] || pointInPolygon(gx, gy, lassoPoints)) {
-                const p = getPixel(activeBuf, state.gridW, gx, gy);
-                const dIdx = (sy * w + sx) * 4;
-                selData[dIdx] = p[0]; selData[dIdx+1] = p[1]; selData[dIdx+2] = p[2]; selData[dIdx+3] = p[3];
-                setPixelRaw(activeBuf, state.gridW, state.gridH, gx, gy, [0, 0, 0, 0]);
-                hasAnyPixel = true;
+          for (let gy = 0; gy < state.gridH; gy++) {
+            for (let gx = 0; gx < state.gridW; gx++) {
+              if (!draftSelMask[gy * state.gridW + gx] && pointInPolygon(gx, gy, lassoPoints)) {
+                draftSelMask[gy * state.gridW + gx] = 1;
               }
             }
           }
-
-          if (hasAnyPixel) {
-            state.selection = { x: minX, y: minY, w, h, data: selData };
-            updateSelectionBar();
-          } else {
-            undoStack.pop();
-            updateHistoryUI();
-          }
-          lassoPoints = [];
-          render();
-          return;
         }
 
-        // Seleção Retangular
-        const minX = Math.min(startX, lastX), minY = Math.min(startY, lastY);
-        const w = Math.abs(lastX - startX) + 1, h = Math.abs(lastY - startY) + 1;
-        saveState();
-        const selData = new Uint8Array(w * h * 4);
-        for (let sy = 0; sy < h; sy++) {
-          for (let sx = 0; sx < w; sx++) {
-            const p = getPixel(activeBuf, state.gridW, minX + sx, minY + sy);
-            const dIdx = (sy * w + sx) * 4;
-            selData[dIdx] = p[0]; selData[dIdx+1] = p[1]; selData[dIdx+2] = p[2]; selData[dIdx+3] = p[3];
-            setPixelRaw(activeBuf, state.gridW, state.gridH, minX + sx, minY + sy, [0, 0, 0, 0]);
-          }
-        }
-        state.selection = { x: minX, y: minY, w, h, data: selData };
-        updateSelectionBar();
-        render();
+        applySelectionMask(draftSelMask);
+        draftSelMask = null;
+        lassoPoints = [];
       }
       return;
     }
@@ -1199,6 +1354,7 @@
     }
     selCreating = false;
     selDragging = false;
+    draftSelMask = null;
   }
 
   canvas.addEventListener('touchstart', e => {
@@ -2581,6 +2737,7 @@
       if (k === 'r') selectTool('rect');
       if (k === 'm') selectTool('select');
       if (k === 'o') selectTool('lasso');
+      if (k === 's') selectTool('selbrush');
       if (k === 'e') selectTool('eraser');
     }
   });
