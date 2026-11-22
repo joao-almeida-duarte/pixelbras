@@ -105,7 +105,8 @@
       <button id="tool-magic" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-cyan-400 shrink-0" title="Varinha Transparente (Apaga área contígua)">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/></svg>
       </button>
-      <a id="tool-about" href="https://github.com/joao-almeida-duarte/pixelbras#readme" target="_blank" rel="noopener noreferrer" class="tool-btn flex items-center justify-center px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-bold text-zinc-300 hover:text-white hover:border-zinc-500 shrink-0" title="Sobre / Manual do PixelBras">?</a>
+            <button id="tool-pan" data-tool="pan" class="tool-btn flex items-center justify-center px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-bold text-zinc-300 hover:text-white shrink-0" title="Mover Tela / Pan (H ou Botão Meio/Direito)">✋</button>
+<a id="tool-about" href="https://github.com/joao-almeida-duarte/pixelbras#readme" target="_blank" rel="noopener noreferrer" class="tool-btn flex items-center justify-center px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-bold text-zinc-300 hover:text-white hover:border-zinc-500 shrink-0" title="Sobre / Manual do PixelBras">?</a>
     </div>
 
     <div class="w-px h-6 bg-zinc-700 mx-0.5 shrink-0"></div>
@@ -617,8 +618,23 @@
       drawH = availH;
       drawW = availH * ratio;
     }
-    canvas.style.width = Math.floor(drawW) + 'px';
-    canvas.style.height = Math.floor(drawH) + 'px';
+    const cssW = Math.max(1, Math.floor(drawW));
+    const cssH = Math.max(1, Math.floor(drawH));
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    // Garante resolução interna suficiente para nunca pular pixels de 1px em telas grandes
+    const targetBufW = Math.max(state.gridW, cssW);
+    const targetBufH = Math.max(state.gridH, cssH);
+    if (canvas.width !== targetBufW || canvas.height !== targetBufH) {
+      canvas.width = targetBufW;
+      canvas.height = targetBufH;
+      gl.viewport(0, 0, targetBufW, targetBufH);
+      if (typeof _texAllocatedW !== 'undefined' && _texAllocatedW === state.gridW && _texAllocatedH === state.gridH) {
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      } else if (typeof render === 'function' && state.frames && state.frames.length > 0) {
+        render();
+      }
+    }
     applyTransform();
   }
 
@@ -1036,17 +1052,40 @@
     return { buf: _reusableMaskBuf, hasAny };
   }
 
-  // Atualiza apenas o retângulo sujo (Dirty Rect) na GPU via texSubImage2D
+  let _pendingDirty = null;
+  let _dirtyRafId = null;
+
   function renderDirtyRect(x0, y0, x1, y1, pad = 2) {
+    const minX = Math.max(0, Math.min(x0, x1) - pad);
+    const minY = Math.max(0, Math.min(y0, y1) - pad);
+    const maxX = Math.min(state.gridW - 1, Math.max(x0, x1) + pad);
+    const maxY = Math.min(state.gridH - 1, Math.max(y0, y1) + pad);
+    if (!_pendingDirty) {
+      _pendingDirty = { minX, minY, maxX, maxY };
+    } else {
+      if (minX < _pendingDirty.minX) _pendingDirty.minX = minX;
+      if (minY < _pendingDirty.minY) _pendingDirty.minY = minY;
+      if (maxX > _pendingDirty.maxX) _pendingDirty.maxX = maxX;
+      if (maxY > _pendingDirty.maxY) _pendingDirty.maxY = maxY;
+    }
+    if (!_dirtyRafId) {
+      _dirtyRafId = requestAnimationFrame(() => {
+        _dirtyRafId = null;
+        if (!_pendingDirty) return;
+        const d = _pendingDirty;
+        _pendingDirty = null;
+        flushDirtyRect(d.minX, d.minY, d.maxX, d.maxY);
+      });
+    }
+  }
+
+  // Atualiza apenas o retângulo sujo (Dirty Rect) na GPU via texSubImage2D
+  function flushDirtyRect(minX, minY, maxX, maxY) {
     if (_texAllocatedW !== state.gridW || _texAllocatedH !== state.gridH || (typeof transformEngine !== 'undefined' && transformEngine.state.active)) {
       render();
       return;
     }
 
-    const minX = Math.max(0, Math.min(x0, x1) - pad);
-    const minY = Math.max(0, Math.min(y0, y1) - pad);
-    const maxX = Math.min(state.gridW - 1, Math.max(x0, x1) + pad);
-    const maxY = Math.min(state.gridH - 1, Math.max(y0, y1) + pad);
     const rw = maxX - minX + 1;
     const rh = maxY - minY + 1;
     if (rw <= 0 || rh <= 0) return;
@@ -1236,9 +1275,15 @@
     let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
     let err = dx + dy;
+    const stepInterval = size >= 4 ? Math.max(1, Math.floor(size * 0.22)) : 1;
+    let stepCount = 0;
     while (true) {
-      setPixel(buf, state.gridW, state.gridH, x0, y0, color, size);
-      if (x0 === x1 && y0 === y1) break;
+      const isEnd = (x0 === x1 && y0 === y1);
+      if (stepCount === 0 || isEnd) {
+        setPixel(buf, state.gridW, state.gridH, x0, y0, color, size);
+      }
+      if (isEnd) break;
+      stepCount = (stepCount + 1) % stepInterval;
       let e2 = 2 * err;
       if (e2 >= dy) { err += dy; x0 += sx; }
       if (e2 <= dx) { err += dx; y0 += sy; }
@@ -1495,6 +1540,11 @@
     }
     if (inside) updateStatus(ux, uy);
 
+    if (state.currentTool === 'pan') {
+      isMousePanning = true;
+      panLastClient = [clientX, clientY];
+      return;
+    }
     if (isSelectionTool(state.currentTool)) {
       const hitH = transformEngine.hitTestHandle(clientX, clientY);
       if (hitH) {
@@ -1562,7 +1612,7 @@
     hasEnteredCanvas = inside;
     startX = ux; startY = uy;
     const activeBuf = getActivePixels();
-    strokeSnapshot = new Uint8Array(activeBuf);
+    strokeSnapshot = (state.currentTool === 'line' || state.currentTool === 'rect') ? new Uint8Array(activeBuf) : null;
 
     if (inside && (state.currentTool === 'brush' || state.currentTool === 'eraser')) {
       setPixel(activeBuf, state.gridW, state.gridH, ux, uy, activeColor, state.brushSize);
@@ -1580,6 +1630,13 @@
       if (getActiveLayer().visible && !transformEngine.isDraggingHandle()) updateStatus(ux, uy);
     }
 
+    if (state.currentTool === 'pan' && isMousePanning) {
+      state.panX += clientX - panLastClient[0];
+      state.panY += clientY - panLastClient[1];
+      panLastClient = [clientX, clientY];
+      applyTransform();
+      return;
+    }
     if (isSelectionTool(state.currentTool)) {
       if (transformEngine.isDraggingHandle()) {
         transformEngine.updateHandleDrag(gx, gy, shiftKey);
@@ -1827,16 +1884,58 @@
     if (e.touches.length === 0) isTwoFingerGesture = false;
   }, { passive: false });
 
+  let isMousePanning = false;
+  let panLastClient = [0, 0];
+
+  workspace.addEventListener('contextmenu', e => {
+    if (!isWorkspaceUIControl(e.target)) e.preventDefault();
+  });
+
   workspace.addEventListener('mousedown', e => {
-    if (e.button !== 0 || isWorkspaceUIControl(e.target)) return;
+    if (isWorkspaceUIControl(e.target)) return;
+    // Botão do meio (1), botão direito (2) ou botão esquerdo (0) com ferramenta Mãozinha
+    if (e.button === 1 || e.button === 2 || (e.button === 0 && state.currentTool === 'pan')) {
+      e.preventDefault();
+      isMousePanning = true;
+      panLastClient = [e.clientX, e.clientY];
+      workspace.style.cursor = 'grabbing';
+      return;
+    }
+    if (e.button !== 0) return;
     handleStart(e.clientX, e.clientY);
   });
+
   window.addEventListener('mousemove', e => {
+    if (isMousePanning) {
+      state.panX += e.clientX - panLastClient[0];
+      state.panY += e.clientY - panLastClient[1];
+      panLastClient = [e.clientX, e.clientY];
+      applyTransform();
+      return;
+    }
     if (isDrawing || selDragging || selCreating || transformEngine.isDraggingHandle() || e.target === canvas) {
       handleMove(e.clientX, e.clientY, e.shiftKey);
     }
   });
-  window.addEventListener('mouseup', handleEnd);
+
+  window.addEventListener('mouseup', () => {
+    if (isMousePanning) {
+      isMousePanning = false;
+      workspace.style.cursor = '';
+      return;
+    }
+    handleEnd();
+  });
+
+  document.getElementById('tool-pan')?.addEventListener('click', () => selectTool('pan'));
+
+  // Atalho 'H' para a ferramenta Mãozinha (Pan)
+  window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.key.toLowerCase() === 'h' && !e.ctrlKey && !e.metaKey) {
+      selectTool('pan');
+    }
+  });
 
   // =========================================================================
   // 8. EXPORTAÇÃO DETERMINÍSTICA (PNG, WEBP, GIF ANIMADO E WEBP ANIMADO)

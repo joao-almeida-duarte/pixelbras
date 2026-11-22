@@ -116,33 +116,81 @@
       selState.ty += (oldOriginGy - newOriginGy);
     }
 
-    function sampleClipToGrid(clip) {
-      const outData = new Uint8Array(state.gridW * state.gridH * 4);
-      const outMask = new Uint8Array(state.gridW * state.gridH);
-      const halfW = selState.baseW / 2;
-      const halfH = selState.baseH / 2;
+    function getTransformKey() {
+      return `${state.gridW}x${state.gridH}|${selState.tx}|${selState.ty}|${selState.scaleX}|${selState.scaleY}|${selState.angle}|${selState.skewX}|${selState.skewY}|${selState.pivotX}|${selState.pivotY}`;
+    }
 
-      for (let gy = 0; gy < state.gridH; gy++) {
-        for (let gx = 0; gx < state.gridW; gx++) {
-          const [lx, ly] = gridToLocal(gx + 0.5, gy + 0.5);
-          const sx = Math.floor(lx + halfW);
-          const sy = Math.floor(ly + halfH);
-          if (sx >= 0 && sx < selState.baseW && sy >= 0 && sy < selState.baseH) {
-            const mIdx = sy * selState.baseW + sx;
-            if (clip.mask[mIdx]) {
-              const gIdx = gy * state.gridW + gx;
-              outMask[gIdx] = 1;
-              const sIdx = mIdx * 4;
-              const dIdx = gIdx * 4;
-              outData[dIdx] = clip.data[sIdx];
-              outData[dIdx + 1] = clip.data[sIdx + 1];
-              outData[dIdx + 2] = clip.data[sIdx + 2];
-              outData[dIdx + 3] = clip.data[sIdx + 3];
+    function getProjectedBounds() {
+      const hw = selState.baseW / 2;
+      const hh = selState.baseH / 2;
+      const c1 = localToGrid(-hw, -hh);
+      const c2 = localToGrid( hw, -hh);
+      const c3 = localToGrid( hw,  hh);
+      const c4 = localToGrid(-hw,  hh);
+      const minX = Math.max(0, Math.floor(Math.min(c1[0], c2[0], c3[0], c4[0])) - 1);
+      const maxX = Math.min(state.gridW - 1, Math.ceil(Math.max(c1[0], c2[0], c3[0], c4[0])) + 1);
+      const minY = Math.max(0, Math.floor(Math.min(c1[1], c2[1], c3[1], c4[1])) - 1);
+      const maxY = Math.min(state.gridH - 1, Math.ceil(Math.max(c1[1], c2[1], c3[1], c4[1])) + 1);
+      return { minX, maxX, minY, maxY };
+    }
+
+    function sampleClipToGrid(clip) {
+      const tKey = getTransformKey();
+      if (clip._cacheKey === tKey && clip._cacheOut) {
+        return clip._cacheOut;
+      }
+
+      const totalPx = state.gridW * state.gridH;
+      if (!clip._outData || clip._outData.length !== totalPx * 4) {
+        clip._outData = new Uint8Array(totalPx * 4);
+        clip._outMask = new Uint8Array(totalPx);
+      } else if (clip._lastBounds) {
+        // Limpa apenas a região anterior em vez de zerar a tela inteira
+        const b = clip._lastBounds;
+        const gw = state.gridW;
+        for (let gy = b.minY; gy <= b.maxY; gy++) {
+          const rowStart = gy * gw + b.minX;
+          const rowLen = b.maxX - b.minX + 1;
+          clip._outMask.fill(0, rowStart, rowStart + rowLen);
+          clip._outData.fill(0, rowStart * 4, (rowStart + rowLen) * 4);
+        }
+      }
+
+      const outData = clip._outData;
+      const outMask = clip._outMask;
+      const bounds = getProjectedBounds();
+      clip._lastBounds = bounds;
+
+      if (bounds.maxX >= bounds.minX && bounds.maxY >= bounds.minY) {
+        const halfW = selState.baseW / 2;
+        const halfH = selState.baseH / 2;
+        const gw = state.gridW;
+
+        for (let gy = bounds.minY; gy <= bounds.maxY; gy++) {
+          for (let gx = bounds.minX; gx <= bounds.maxX; gx++) {
+            const [lx, ly] = gridToLocal(gx + 0.5, gy + 0.5);
+            const sx = Math.floor(lx + halfW);
+            const sy = Math.floor(ly + halfH);
+            if (sx >= 0 && sx < selState.baseW && sy >= 0 && sy < selState.baseH) {
+              const mIdx = sy * selState.baseW + sx;
+              if (clip.mask[mIdx]) {
+                const gIdx = gy * gw + gx;
+                outMask[gIdx] = 1;
+                const sIdx = mIdx * 4;
+                const dIdx = gIdx * 4;
+                outData[dIdx] = clip.data[sIdx];
+                outData[dIdx + 1] = clip.data[sIdx + 1];
+                outData[dIdx + 2] = clip.data[sIdx + 2];
+                outData[dIdx + 3] = clip.data[sIdx + 3];
+              }
             }
           }
         }
       }
-      return { data: outData, mask: outMask };
+
+      clip._cacheKey = tKey;
+      clip._cacheOut = { data: outData, mask: outMask, bounds };
+      return clip._cacheOut;
     }
 
     function getTargetTargets() {
