@@ -56,8 +56,12 @@
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
       </button>
 
-      <button id="tool-select" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Seleção / Mover (M)">
+      <button id="tool-select" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Seleção Retangular / Mover (M)">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"><rect x="3" y="3" width="18" height="18" rx="1"/></svg>
+      </button>
+
+      <button id="tool-lasso" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Seleção por Laço Livre (O)">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 22a5 5 0 0 1-2-4"/><path d="M3.3 14A6.8 6.8 0 0 1 2 10c0-4.4 4.5-8 10-8s10 3.6 10 8-4.5 8-10 8a12 12 0 0 1-5-1"/><path d="M5 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
       </button>
 
       <button id="tool-eraser" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Borracha Transparente (E)">
@@ -492,13 +496,15 @@
         bool insideX = cell.x >= u_selRect.x && cell.x < (u_selRect.x + u_selRect.z);
         bool insideY = cell.y >= u_selRect.y && cell.y < (u_selRect.y + u_selRect.w);
         if (insideX && insideY) {
+          // Realce sutil dentro da área selecionada
+          finalColor = mix(finalColor, vec3(0.02, 0.83, 0.38), 0.12);
           bool border = (cell.x == u_selRect.x || cell.x == u_selRect.x + u_selRect.z - 1.0 ||
                          cell.y == u_selRect.y || cell.y == u_selRect.y + u_selRect.w - 1.0);
           vec2 f = fract(pixelCoord);
-          bool edge = (cell.x == u_selRect.x && f.x < 0.2) ||
-                      (cell.x == u_selRect.x + u_selRect.z - 1.0 && f.x > 0.8) ||
-                      (cell.y == u_selRect.y && f.y < 0.2) ||
-                      (cell.y == u_selRect.y + u_selRect.w - 1.0 && f.y > 0.8);
+          bool edge = (cell.x == u_selRect.x && f.x < 0.22) ||
+                      (cell.x == u_selRect.x + u_selRect.z - 1.0 && f.x > 0.78) ||
+                      (cell.y == u_selRect.y && f.y < 0.22) ||
+                      (cell.y == u_selRect.y + u_selRect.w - 1.0 && f.y > 0.78);
           if (border && edge) {
             float dash = mod(floor(pixelCoord.x * 4.0) + floor(pixelCoord.y * 4.0), 2.0);
             finalColor = mix(vec3(0.02, 0.83, 0.38), vec3(1.0), dash);
@@ -828,11 +834,16 @@
   }
 
   // =========================================================================
-  // 6. SELEÇÃO FLUTUANTE
+  // 6. SELEÇÃO FLUTUANTE (RETANGULAR E LAÇO LIVRE)
   // =========================================================================
   let selDragging = false;
   let selDragOffset = [0, 0];
   let selCreating = false;
+  let lassoPoints = []; // Pontos [x, y] do traçado do laço
+
+  function isSelectionTool(t) {
+    return t === 'select' || t === 'lasso';
+  }
 
   function updateSelectionBar() {
     document.getElementById('selectionBar').classList.toggle('hidden', !state.selection);
@@ -857,6 +868,19 @@
     render();
   }
 
+  // Algoritmo Ray-Casting (Ponto dentro do polígono do Laço)
+  function pointInPolygon(px, py, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i][0] + 0.5, yi = poly[i][1] + 0.5;
+      const xj = poly[j][0] + 0.5, yj = poly[j][1] + 0.5;
+      const intersect = ((yi > py + 0.5) !== (yj > py + 0.5)) &&
+                        (px + 0.5 < (xj - xi) * (py + 0.5 - yi) / (yj - yi + 1e-9) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
   document.getElementById('btnSelCommit').addEventListener('click', commitSelection);
   document.getElementById('btnSelDelete').addEventListener('click', () => {
     state.selection = null;
@@ -867,11 +891,11 @@
   // =========================================================================
   // 7. INTERAÇÃO MOUSE & TOUCH (COM PROTEÇÃO DE 2 DEDOS)
   // =========================================================================
-  const tools = ['brush', 'bucket', 'picker', 'line', 'rect', 'select', 'eraser', 'magic'];
+  const tools = ['brush', 'bucket', 'picker', 'line', 'rect', 'select', 'lasso', 'eraser', 'magic'];
   const brushPanel = document.getElementById('brushPanel');
 
   function selectTool(name) {
-    if (state.currentTool === 'select' && name !== 'select') commitSelection();
+    if (isSelectionTool(state.currentTool) && !isSelectionTool(name)) commitSelection();
     state.currentTool = name;
     tools.forEach(t => document.getElementById(`tool-${t}`).classList.toggle('active', t === name));
   }
@@ -917,7 +941,7 @@
     }
     updateStatus(x, y);
 
-    if (state.currentTool === 'select') {
+    if (isSelectionTool(state.currentTool)) {
       const sel = state.selection;
       if (sel && x >= sel.x && x < sel.x + sel.w && y >= sel.y && y < sel.y + sel.h) {
         selDragging = true;
@@ -927,6 +951,7 @@
       commitSelection();
       selCreating = true;
       startX = x; startY = y;
+      lassoPoints = [[x, y]];
       render(null, { x, y, w: 1, h: 1 });
       return;
     }
@@ -970,23 +995,41 @@
 
   function handleMove(clientX, clientY) {
     const [x, y] = getCoords(clientX, clientY);
+    lastX = x; lastY = y;
     if (getActiveLayer().visible) updateStatus(x, y);
 
-    if (state.currentTool === 'select') {
+    if (isSelectionTool(state.currentTool)) {
       if (selDragging && state.selection) {
         state.selection.x = x - selDragOffset[0];
         state.selection.y = y - selDragOffset[1];
         render();
       } else if (selCreating) {
-        const minX = Math.min(startX, x), minY = Math.min(startY, y);
-        const w = Math.abs(x - startX) + 1, h = Math.abs(y - startY) + 1;
-        render(null, { x: minX, y: minY, w, h });
+        if (state.currentTool === 'lasso') {
+          const prevPt = lassoPoints[lassoPoints.length - 1];
+          if (!prevPt || prevPt[0] !== x || prevPt[1] !== y) {
+            lassoPoints.push([x, y]);
+          }
+          // Mostra pré-visualização da linha do laço e bounding box
+          const preview = new Uint8Array(getActivePixels());
+          let minX = state.gridW, minY = state.gridH, maxX = 0, maxY = 0;
+          for (let i = 0; i < lassoPoints.length; i++) {
+            const [lx, ly] = lassoPoints[i];
+            if (lx < minX) minX = lx; if (lx > maxX) maxX = lx;
+            if (ly < minY) minY = ly; if (ly > maxY) maxY = ly;
+            if (i > 0) drawLine(preview, lassoPoints[i-1][0], lassoPoints[i-1][1], lx, ly, [4, 211, 97, 255], 1);
+            else setPixelRaw(preview, state.gridW, state.gridH, lx, ly, [4, 211, 97, 255]);
+          }
+          render(preview, { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 });
+        } else {
+          const minX = Math.min(startX, x), minY = Math.min(startY, y);
+          const w = Math.abs(x - startX) + 1, h = Math.abs(y - startY) + 1;
+          render(null, { x: minX, y: minY, w, h });
+        }
       }
       return;
     }
 
     if (!isDrawing) return;
-    lastX = x; lastY = y;
     const activeColor = state.currentTool === 'eraser' ? [0, 0, 0, 0] : state.currentColor;
     const activeBuf = getActivePixels();
 
@@ -1006,17 +1049,71 @@
   }
 
   function handleEnd() {
-    if (state.currentTool === 'select') {
+    if (isSelectionTool(state.currentTool)) {
       if (selDragging) {
         selDragging = false;
         return;
       }
       if (selCreating) {
         selCreating = false;
+        const activeBuf = getActivePixels();
+
+        if (state.currentTool === 'lasso' && lassoPoints.length >= 3) {
+          let minX = state.gridW, minY = state.gridH, maxX = 0, maxY = 0;
+          // Marca borda do laço em uma máscara auxiliar
+          const borderMask = new Uint8Array(state.gridW * state.gridH);
+          for (let i = 0; i < lassoPoints.length; i++) {
+            const [lx, ly] = lassoPoints[i];
+            const [nx, ny] = lassoPoints[(i + 1) % lassoPoints.length];
+            if (lx < minX) minX = lx; if (lx > maxX) maxX = lx;
+            if (ly < minY) minY = ly; if (ly > maxY) maxY = ly;
+            // Marca pontos da linha do polígono
+            let dx = Math.abs(nx - lx), sx = lx < nx ? 1 : -1;
+            let dy = -Math.abs(ny - ly), sy = ly < ny ? 1 : -1;
+            let err = dx + dy, cx = lx, cy = ly;
+            while (true) {
+              borderMask[cy * state.gridW + cx] = 1;
+              if (cx === nx && cy === ny) break;
+              let e2 = 2 * err;
+              if (e2 >= dy) { err += dy; cx += sx; }
+              if (e2 <= dx) { err += dx; cy += sy; }
+            }
+          }
+
+          const w = maxX - minX + 1, h = maxY - minY + 1;
+          saveState();
+          const selData = new Uint8Array(w * h * 4);
+          let hasAnyPixel = false;
+
+          for (let sy = 0; sy < h; sy++) {
+            for (let sx = 0; sx < w; sx++) {
+              const gx = minX + sx, gy = minY + sy;
+              if (borderMask[gy * state.gridW + gx] || pointInPolygon(gx, gy, lassoPoints)) {
+                const p = getPixel(activeBuf, state.gridW, gx, gy);
+                const dIdx = (sy * w + sx) * 4;
+                selData[dIdx] = p[0]; selData[dIdx+1] = p[1]; selData[dIdx+2] = p[2]; selData[dIdx+3] = p[3];
+                setPixelRaw(activeBuf, state.gridW, state.gridH, gx, gy, [0, 0, 0, 0]);
+                hasAnyPixel = true;
+              }
+            }
+          }
+
+          if (hasAnyPixel) {
+            state.selection = { x: minX, y: minY, w, h, data: selData };
+            updateSelectionBar();
+          } else {
+            undoStack.pop();
+            updateHistoryUI();
+          }
+          lassoPoints = [];
+          render();
+          return;
+        }
+
+        // Seleção Retangular
         const minX = Math.min(startX, lastX), minY = Math.min(startY, lastY);
         const w = Math.abs(lastX - startX) + 1, h = Math.abs(lastY - startY) + 1;
         saveState();
-        const activeBuf = getActivePixels();
         const selData = new Uint8Array(w * h * 4);
         for (let sy = 0; sy < h; sy++) {
           for (let sx = 0; sx < w; sx++) {
@@ -2234,6 +2331,7 @@
       if (k === 'l') selectTool('line');
       if (k === 'r') selectTool('rect');
       if (k === 'm') selectTool('select');
+      if (k === 'o') selectTool('lasso');
       if (k === 'e') selectTool('eraser');
     }
   });
