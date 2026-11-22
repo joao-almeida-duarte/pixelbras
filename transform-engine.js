@@ -34,7 +34,21 @@
 
     // Área de transferência rápida e memória do passo para "Repetir"
     let quickClipboard = null; // { baseW, baseH, data: Uint8Array, mask: Uint8Array }
-    let lastRepeatStep = null; // { tx, ty, scaleX, scaleY, angle, skewX, skewY }
+    let lastRepeatStep = null;
+    let repeatBase = null;
+
+    function captureRepeatBase() {
+      repeatBase = {
+        tx: selState.tx,
+        ty: selState.ty,
+        scaleX: selState.scaleX,
+        scaleY: selState.scaleY,
+        angle: selState.angle,
+        skewX: selState.skewX,
+        skewY: selState.skewY
+      };
+      lastRepeatStep = null;
+    } // { tx, ty, scaleX, scaleY, angle, skewX, skewY }
 
     const overlay = document.createElement('canvas');
     overlay.id = 'transformOverlay';
@@ -107,6 +121,13 @@
 
     // Move o fulcro para uma posição do grid mantendo os pixels visualmente parados no mesmo lugar
     function movePivotToGrid(gx, gy) {
+      const wasAtBase = !lastRepeatStep && (!repeatBase || (
+        Math.abs(selState.tx - repeatBase.tx) < 1e-4 &&
+        Math.abs(selState.ty - repeatBase.ty) < 1e-4 &&
+        Math.abs(selState.angle - repeatBase.angle) < 1e-4 &&
+        Math.abs(selState.scaleX - repeatBase.scaleX) < 1e-4 &&
+        Math.abs(selState.scaleY - repeatBase.scaleY) < 1e-4
+      ));
       const [newPivotX, newPivotY] = gridToLocal(gx, gy);
       const [oldOriginGx, oldOriginGy] = localToGrid(0, 0);
       selState.pivotX = newPivotX;
@@ -114,6 +135,9 @@
       const [newOriginGx, newOriginGy] = localToGrid(0, 0);
       selState.tx += (oldOriginGx - newOriginGx);
       selState.ty += (oldOriginGy - newOriginGy);
+      if (wasAtBase) {
+        captureRepeatBase();
+      }
     }
 
     function getTransformKey() {
@@ -443,6 +467,7 @@
         mask: new Uint8Array(quickClipboard.mask)
       }];
       state.selection = selState;
+      captureRepeatBase();
       render();
       return true;
     }
@@ -466,7 +491,7 @@
           }
         }
       }
-      lastRepeatStep = null;
+      captureRepeatBase();
       updateStatus(0, 0, '⧉ Seleção clonada no lugar! Transforme ou arraste livremente.');
       render();
       return true;
@@ -478,24 +503,33 @@
       const n = Math.max(1, Math.min(64, parseInt(times, 10) || 1));
 
       if (!lastRepeatStep) {
+        const base = repeatBase || { tx: 0, ty: 0, scaleX: 1, scaleY: 1, angle: 0, skewX: 0, skewY: 0 };
+        const dTx = selState.tx - base.tx;
+        const dTy = selState.ty - base.ty;
+        const dAngle = selState.angle - base.angle;
+        const rScaleX = Math.abs(base.scaleX) > 1e-4 ? selState.scaleX / base.scaleX : selState.scaleX;
+        const rScaleY = Math.abs(base.scaleY) > 1e-4 ? selState.scaleY / base.scaleY : selState.scaleY;
+        const dSkewX = selState.skewX - base.skewX;
+        const dSkewY = selState.skewY - base.skewY;
+
         const hasDelta = (
-          Math.abs(selState.tx) > 1e-4 || Math.abs(selState.ty) > 1e-4 ||
-          Math.abs(selState.angle) > 1e-4 ||
-          Math.abs(selState.scaleX - 1) > 1e-4 || Math.abs(selState.scaleY - 1) > 1e-4 ||
-          Math.abs(selState.skewX) > 1e-4 || Math.abs(selState.skewY) > 1e-4
+          Math.abs(dTx) > 1e-4 || Math.abs(dTy) > 1e-4 ||
+          Math.abs(dAngle) > 1e-4 ||
+          Math.abs(rScaleX - 1) > 1e-4 || Math.abs(rScaleY - 1) > 1e-4 ||
+          Math.abs(dSkewX) > 1e-4 || Math.abs(dSkewY) > 1e-4
         );
         if (!hasDelta) {
           updateStatus(0, 0, '⚠️ Mova, gire ou escale a seleção antes de clicar em Repetir.');
           return false;
         }
         lastRepeatStep = {
-          tx: selState.tx,
-          ty: selState.ty,
-          scaleX: selState.scaleX,
-          scaleY: selState.scaleY,
-          angle: selState.angle,
-          skewX: selState.skewX,
-          skewY: selState.skewY
+          tx: dTx,
+          ty: dTy,
+          scaleX: rScaleX,
+          scaleY: rScaleY,
+          angle: dAngle,
+          skewX: dSkewX,
+          skewY: dSkewY
         };
       }
 
