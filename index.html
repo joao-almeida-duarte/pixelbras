@@ -139,6 +139,10 @@
       <button id="btnSelCopy" class="px-2 py-1 rounded bg-zinc-800 border border-sky-500/50 text-sky-300 font-semibold" title="Copiar Seleção">Copiar</button>
       <button id="btnSelPaste" class="px-2 py-1 rounded bg-zinc-800 border border-sky-500/50 text-sky-300 font-semibold" title="Colar Seleção">Colar</button>
       <button id="btnSelClone" class="px-2 py-1 rounded bg-zinc-800 border border-purple-500/50 text-purple-300 font-semibold" title="Clonar Seleção no Lugar">Clonar</button>
+      <div class="flex items-center rounded bg-zinc-800 border border-amber-500/60 overflow-hidden">
+        <input id="repeatCountInput" type="number" min="1" max="64" value="1" class="w-10 bg-zinc-900 text-amber-200 text-center text-xs font-mono py-1 outline-none" title="Quantidade de repetições (1 a 64)">
+        <button id="btnSelRepeat" class="px-2 py-1 text-amber-300 font-bold hover:bg-zinc-700/70" title="Repetir última transformação N vezes">↻ Repetir</button>
+      </div>
       <button id="btnSelDelete" class="px-2 py-1 rounded bg-red-900/80 text-red-200 font-semibold">Apagar</button>
       <button id="btnSelCommit" class="px-2.5 py-1 rounded bg-emerald-500 text-zinc-950 font-bold">Fixar</button>
     </div>
@@ -663,9 +667,13 @@
 
       if (u_hasSelMask > 0.5) {
         vec2 texel = 1.0 / u_gridSize;
-        float mCenter = texture2D(u_selMask, (cell + 0.5) * texel).a;
+        vec4 mSample = texture2D(u_selMask, (cell + 0.5) * texel);
+        float mCenter = mSample.a;
         if (mCenter > 0.5) {
-          finalColor = mix(finalColor, vec3(0.02, 0.83, 0.38), 0.16);
+          bool isNeg = mSample.r > 0.5;
+          vec3 tintCol = isNeg ? vec3(0.96, 0.25, 0.37) : vec3(0.02, 0.83, 0.38);
+          finalColor = mix(finalColor, tintCol, isNeg ? 0.30 : 0.16);
+
           float mLeft  = cell.x > 0.0 ? texture2D(u_selMask, (cell + vec2(-0.5, 0.5)) * texel).a : 0.0;
           float mRight = cell.x < (u_gridSize.x - 1.0) ? texture2D(u_selMask, (cell + vec2(1.5, 0.5)) * texel).a : 0.0;
           float mUp    = cell.y > 0.0 ? texture2D(u_selMask, (cell + vec2(0.5, -0.5)) * texel).a : 0.0;
@@ -678,7 +686,7 @@
                       (mDown < 0.5 && f.y > 0.78);
           if (edge) {
             float dash = mod(floor(pixelCoord.x * 4.0) + floor(pixelCoord.y * 4.0), 2.0);
-            finalColor = mix(vec3(0.02, 0.83, 0.38), vec3(1.0), dash);
+            finalColor = mix(tintCol, vec3(1.0), dash);
           }
         }
       }
@@ -879,8 +887,10 @@
       }
     }
     if (previewMask) {
+      const isNegPreview = (typeof transformEngine !== 'undefined' && transformEngine.state.mode === 'sub');
       for (let i = 0; i < previewMask.length; i++) {
         if (previewMask[i]) {
+          if (isNegPreview) maskTexBuf[i * 4] = 255;
           maskTexBuf[i * 4 + 3] = 255;
           hasAny = true;
         }
@@ -1114,6 +1124,10 @@
   document.getElementById('btnSelCopy').addEventListener('click', () => transformEngine.copyQuickSelection());
   document.getElementById('btnSelPaste').addEventListener('click', () => { transformEngine.pasteQuickSelection(0, 0); updateSelectionBar(); });
   document.getElementById('btnSelClone').addEventListener('click', () => transformEngine.cloneQuickSelection());
+  document.getElementById('btnSelRepeat').addEventListener('click', () => {
+    const n = parseInt(document.getElementById('repeatCountInput').value, 10) || 1;
+    transformEngine.repeatTransform(n);
+  });
 
   function isSelectionTool(t) {
     return t === 'select' || t === 'lasso' || t === 'selbrush';
@@ -1239,7 +1253,11 @@
     });
   });
 
-  let isDrawing = false, startX = 0, startY = 0, lastX = 0, lastY = 0, strokeSnapshot = null;
+  let isDrawing = false, hasEnteredCanvas = false, startX = 0, startY = 0, lastX = 0, lastY = 0, strokeSnapshot = null;
+
+  function isInsideGrid(x, y) {
+    return x >= 0 && x < state.gridW && y >= 0 && y < state.gridH;
+  }
 
   function getCoords(clientX, clientY, clamp = true) {
     const rect = canvas.getBoundingClientRect();
@@ -1271,53 +1289,59 @@
 
   function handleStart(clientX, clientY) {
     stopPlayback();
-    const [x, y] = getCoords(clientX, clientY);
+    const [ux, uy] = getCoords(clientX, clientY, false);
+    const inside = isInsideGrid(ux, uy);
     const [gx, gy] = getExactGridCoords(clientX, clientY);
-    lastX = x; lastY = y;
+    if (inside) { lastX = ux; lastY = uy; }
 
     const layer = getActiveLayer();
     if (!layer.visible && state.currentTool !== 'picker') {
-      updateStatus(x, y, `⚠️ ${layer.name} está oculta!`);
+      updateStatus(lastX, lastY, `⚠️ ${layer.name} está oculta!`);
       return;
     }
-    updateStatus(x, y);
+    if (inside) updateStatus(ux, uy);
 
     if (isSelectionTool(state.currentTool)) {
-      // 1. Verifica se clicou em alguma alça de transformação (Ampliar, Espelhar, Girar, Shear)
       const hitH = transformEngine.hitTestHandle(clientX, clientY);
       if (hitH) {
         transformEngine.beginHandleDrag(hitH, gx, gy);
         return;
       }
 
-      // 2. Verifica se clicou dentro da seleção ativa para arrastar/mover
-      if (transformEngine.state.mode === 'replace' && transformEngine.isPointInside(gx, gy)) {
+      if (inside && transformEngine.state.mode === 'replace' && transformEngine.isPointInside(gx, gy)) {
         selDragging = true;
-        selLastGridPos = [x, y];
+        selLastGridPos = [ux, uy];
         return;
       }
 
-      // 3. Caso contrário, inicia novo traçado de máscara de seleção
       if (transformEngine.state.mode === 'replace') commitSelection();
       selCreating = true;
-      startX = x; startY = y;
+      hasEnteredCanvas = inside;
+      startX = ux; startY = uy;
       draftSelMask = new Uint8Array(state.gridW * state.gridH);
+      lassoPoints = [];
 
-      if (state.currentTool === 'lasso') {
-        lassoPoints = [[x, y]];
-        draftSelMask[y * state.gridW + x] = 1;
-      } else if (state.currentTool === 'selbrush') {
-        stampBrushOnMask(draftSelMask, x, y);
-      } else {
-        draftSelMask[y * state.gridW + x] = 1;
+      if (inside) {
+        if (state.currentTool === 'lasso') {
+          lassoPoints.push([ux, uy]);
+          draftSelMask[uy * state.gridW + ux] = 1;
+        } else if (state.currentTool === 'selbrush') {
+          stampBrushOnMask(draftSelMask, ux, uy);
+        } else {
+          draftSelMask[uy * state.gridW + ux] = 1;
+        }
+        render(null, draftSelMask);
       }
-      render(null, draftSelMask);
+      return;
+    }
+
+    if (!inside && (state.currentTool === 'picker' || state.currentTool === 'bucket' || state.currentTool === 'magic' || state.currentTool === 'line' || state.currentTool === 'rect')) {
       return;
     }
 
     if (state.currentTool === 'picker') {
       const comp = getCompositeBuffer();
-      const picked = getPixel(comp, state.gridW, x, y);
+      const picked = getPixel(comp, state.gridW, ux, uy);
       if (picked[3] > 0) {
         state.currentColor = [picked[0], picked[1], picked[2], 255];
         syncColorUI();
@@ -1331,7 +1355,7 @@
     if (state.currentTool === 'bucket' || state.currentTool === 'magic') {
       const fillCol = state.currentTool === 'magic' ? [0, 0, 0, 0] : activeColor;
       saveState();
-      if (!floodFill(x, y, fillCol)) {
+      if (!floodFill(ux, uy, fillCol)) {
         undoStack.pop();
         updateHistoryUI();
       }
@@ -1341,21 +1365,26 @@
 
     saveState();
     isDrawing = true;
-    startX = x; startY = y;
+    hasEnteredCanvas = inside;
+    startX = ux; startY = uy;
     const activeBuf = getActivePixels();
     strokeSnapshot = new Uint8Array(activeBuf);
 
-    if (state.currentTool === 'brush' || state.currentTool === 'eraser') {
-      setPixel(activeBuf, state.gridW, state.gridH, x, y, activeColor, state.brushSize);
+    if (inside && (state.currentTool === 'brush' || state.currentTool === 'eraser')) {
+      setPixel(activeBuf, state.gridW, state.gridH, ux, uy, activeColor, state.brushSize);
       render();
     }
   }
 
   function handleMove(clientX, clientY, shiftKey = false) {
-    const [x, y] = getCoords(clientX, clientY);
+    const [ux, uy] = getCoords(clientX, clientY, false);
+    const [x, y] = getCoords(clientX, clientY, true);
+    const inside = isInsideGrid(ux, uy);
     const [gx, gy] = getExactGridCoords(clientX, clientY);
-    lastX = x; lastY = y;
-    if (getActiveLayer().visible && !transformEngine.isDraggingHandle()) updateStatus(x, y);
+    if (inside) {
+      lastX = ux; lastY = uy;
+      if (getActiveLayer().visible && !transformEngine.isDraggingHandle()) updateStatus(ux, uy);
+    }
 
     if (isSelectionTool(state.currentTool)) {
       if (transformEngine.isDraggingHandle()) {
@@ -1363,25 +1392,29 @@
         return;
       }
       if (selDragging && transformEngine.state.active) {
-        const dx = x - selLastGridPos[0];
-        const dy = y - selLastGridPos[1];
+        const dx = ux - selLastGridPos[0];
+        const dy = uy - selLastGridPos[1];
         if (dx !== 0 || dy !== 0) {
           transformEngine.translateBy(dx, dy);
-          selLastGridPos = [x, y];
+          selLastGridPos = [ux, uy];
         }
         return;
       }
       if (selCreating && draftSelMask) {
         if (state.currentTool === 'lasso') {
+          if (!inside) return;
           const prevPt = lassoPoints[lassoPoints.length - 1];
-          if (!prevPt || prevPt[0] !== x || prevPt[1] !== y) {
-            lassoPoints.push([x, y]);
-            let dx = Math.abs(x - prevPt[0]), sx = prevPt[0] < x ? 1 : -1;
-            let dy = -Math.abs(y - prevPt[1]), sy = prevPt[1] < y ? 1 : -1;
+          if (!prevPt) {
+            lassoPoints.push([ux, uy]);
+            draftSelMask[uy * state.gridW + ux] = 1;
+          } else if (prevPt[0] !== ux || prevPt[1] !== uy) {
+            lassoPoints.push([ux, uy]);
+            let dx = Math.abs(ux - prevPt[0]), sx = prevPt[0] < ux ? 1 : -1;
+            let dy = -Math.abs(uy - prevPt[1]), sy = prevPt[1] < uy ? 1 : -1;
             let err = dx + dy, cx = prevPt[0], cy = prevPt[1];
             while (true) {
               draftSelMask[cy * state.gridW + cx] = 1;
-              if (cx === x && cy === y) break;
+              if (cx === ux && cy === uy) break;
               let e2 = 2 * err;
               if (e2 >= dy) { err += dy; cx += sx; }
               if (e2 <= dx) { err += dx; cy += sy; }
@@ -1389,13 +1422,21 @@
           }
           render(null, draftSelMask);
         } else if (state.currentTool === 'selbrush') {
-          drawLineOnMask(draftSelMask, startX, startY, x, y);
-          startX = x; startY = y;
+          if (!inside) { hasEnteredCanvas = false; return; }
+          if (!hasEnteredCanvas) {
+            stampBrushOnMask(draftSelMask, ux, uy);
+            hasEnteredCanvas = true;
+          } else {
+            drawLineOnMask(draftSelMask, startX, startY, ux, uy);
+          }
+          startX = ux; startY = uy;
           render(null, draftSelMask);
         } else {
           draftSelMask.fill(0);
-          const minX = Math.min(startX, x), maxX = Math.max(startX, x);
-          const minY = Math.min(startY, y), maxY = Math.max(startY, y);
+          const minX = Math.max(0, Math.min(startX, ux));
+          const maxX = Math.min(state.gridW - 1, Math.max(startX, ux));
+          const minY = Math.max(0, Math.min(startY, uy));
+          const maxY = Math.min(state.gridH - 1, Math.max(startY, uy));
           for (let py = minY; py <= maxY; py++) {
             for (let px = minX; px <= maxX; px++) {
               draftSelMask[py * state.gridW + px] = 1;
@@ -1412,8 +1453,14 @@
     const activeBuf = getActivePixels();
 
     if (state.currentTool === 'brush' || state.currentTool === 'eraser') {
-      drawLine(activeBuf, startX, startY, x, y, activeColor, state.brushSize);
-      startX = x; startY = y;
+      if (!inside) { hasEnteredCanvas = false; return; }
+      if (!hasEnteredCanvas) {
+        setPixel(activeBuf, state.gridW, state.gridH, ux, uy, activeColor, state.brushSize);
+        hasEnteredCanvas = true;
+      } else {
+        drawLine(activeBuf, startX, startY, ux, uy, activeColor, state.brushSize);
+      }
+      startX = ux; startY = uy;
       render();
     } else if (state.currentTool === 'line') {
       const preview = new Uint8Array(strokeSnapshot);
@@ -1507,7 +1554,12 @@
     draftSelMask = null;
   }
 
-  canvas.addEventListener('touchstart', e => {
+  function isWorkspaceUIControl(target) {
+    return Boolean(target && target.closest && target.closest('button, input, select, label, #layersPanel'));
+  }
+
+  workspace.addEventListener('touchstart', e => {
+    if (isWorkspaceUIControl(e.target)) return;
     e.preventDefault();
     if (e.touches.length >= 2) {
       isTwoFingerGesture = true;
@@ -1517,7 +1569,6 @@
     if (e.touches.length === 1 && !isTwoFingerGesture) {
       const tx = e.touches[0].clientX;
       const ty = e.touches[0].clientY;
-      // Se tocou numa alça de transformação, responde imediatamente sem atraso
       if (transformEngine.hitTestHandle(tx, ty)) {
         handleStart(tx, ty);
         return;
@@ -1533,7 +1584,8 @@
     }
   }, { passive: false });
 
-  canvas.addEventListener('touchmove', e => {
+  workspace.addEventListener('touchmove', e => {
+    if (isWorkspaceUIControl(e.target) && !isDrawing && !selDragging && !selCreating && !transformEngine.isDraggingHandle()) return;
     e.preventDefault();
     if (e.touches.length >= 2 || isTwoFingerGesture) {
       isTwoFingerGesture = true;
@@ -1559,7 +1611,8 @@
     }
   }, { passive: false });
 
-  canvas.addEventListener('touchend', e => {
+  workspace.addEventListener('touchend', e => {
+    if (isWorkspaceUIControl(e.target) && !isDrawing && !selDragging && !selCreating && !transformEngine.isDraggingHandle() && !pendingTouch) return;
     e.preventDefault();
     if (e.touches.length === 0) {
       if (pendingTouch && !isTwoFingerGesture) {
@@ -1573,14 +1626,20 @@
     }
   }, { passive: false });
 
-  canvas.addEventListener('touchcancel', e => {
-    e.preventDefault();
+  workspace.addEventListener('touchcancel', e => {
     cancelPendingOrActiveStroke();
     if (e.touches.length === 0) isTwoFingerGesture = false;
   }, { passive: false });
 
-  canvas.addEventListener('mousedown', e => { if (e.button === 0) handleStart(e.clientX, e.clientY); });
-  window.addEventListener('mousemove', e => { if (isDrawing || selDragging || selCreating || transformEngine.isDraggingHandle() || e.target === canvas) handleMove(e.clientX, e.clientY, e.shiftKey); });
+  workspace.addEventListener('mousedown', e => {
+    if (e.button !== 0 || isWorkspaceUIControl(e.target)) return;
+    handleStart(e.clientX, e.clientY);
+  });
+  window.addEventListener('mousemove', e => {
+    if (isDrawing || selDragging || selCreating || transformEngine.isDraggingHandle() || e.target === canvas) {
+      handleMove(e.clientX, e.clientY, e.shiftKey);
+    }
+  });
   window.addEventListener('mouseup', handleEnd);
 
   // =========================================================================

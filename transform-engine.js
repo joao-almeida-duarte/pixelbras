@@ -32,8 +32,9 @@
       clips: []
     };
 
-    // Área de transferência rápida da barra de seleção
+    // Área de transferência rápida e memória do passo para "Repetir"
     let quickClipboard = null; // { baseW, baseH, data: Uint8Array, mask: Uint8Array }
+    let lastRepeatStep = null; // { tx, ty, scaleX, scaleY, angle, skewX, skewY }
 
     const overlay = document.createElement('canvas');
     overlay.id = 'transformOverlay';
@@ -45,13 +46,12 @@
 
     function syncOverlayBounds() {
       const wRect = workspace.getBoundingClientRect();
-      const cRect = canvas.getBoundingClientRect();
-      overlay.style.left = (cRect.left - wRect.left) + 'px';
-      overlay.style.top = (cRect.top - wRect.top) + 'px';
-      overlay.width = Math.max(1, Math.round(cRect.width));
-      overlay.height = Math.max(1, Math.round(cRect.height));
-      overlay.style.width = cRect.width + 'px';
-      overlay.style.height = cRect.height + 'px';
+      overlay.style.left = '0px';
+      overlay.style.top = '0px';
+      overlay.width = Math.max(1, Math.round(wRect.width));
+      overlay.height = Math.max(1, Math.round(wRect.height));
+      overlay.style.width = wRect.width + 'px';
+      overlay.style.height = wRect.height + 'px';
     }
 
     // Mapeia ponto local (relativo ao centro do clip) -> coordenada do grid usando o Fulcro (pivotX, pivotY)
@@ -196,6 +196,7 @@
       selState.scaleX = 1; selState.scaleY = 1;
       selState.angle = 0;
       selState.skewX = 0; selState.skewY = 0;
+      lastRepeatStep = null;
       state.selection = null;
       drawOverlay();
     }
@@ -411,9 +412,68 @@
           }
         }
       }
-      selState.tx += 2;
-      selState.ty += 2;
-      updateStatus(0, 0, '⧉ Seleção clonada! Arraste para posicionar.');
+      lastRepeatStep = null;
+      updateStatus(0, 0, '⧉ Seleção clonada no lugar! Transforme ou arraste livremente.');
+      render();
+      return true;
+    }
+
+    // Grava o estado atual na camada e reaplica o mesmo passo de transformação (ideal para rosáceas e padrões)
+    function repeatTransform(times = 1) {
+      if (!selState.active || selState.clips.length === 0) return false;
+      const n = Math.max(1, Math.min(64, parseInt(times, 10) || 1));
+
+      if (!lastRepeatStep) {
+        const hasDelta = (
+          Math.abs(selState.tx) > 1e-4 || Math.abs(selState.ty) > 1e-4 ||
+          Math.abs(selState.angle) > 1e-4 ||
+          Math.abs(selState.scaleX - 1) > 1e-4 || Math.abs(selState.scaleY - 1) > 1e-4 ||
+          Math.abs(selState.skewX) > 1e-4 || Math.abs(selState.skewY) > 1e-4
+        );
+        if (!hasDelta) {
+          updateStatus(0, 0, '⚠️ Mova, gire ou escale a seleção antes de clicar em Repetir.');
+          return false;
+        }
+        lastRepeatStep = {
+          tx: selState.tx,
+          ty: selState.ty,
+          scaleX: selState.scaleX,
+          scaleY: selState.scaleY,
+          angle: selState.angle,
+          skewX: selState.skewX,
+          skewY: selState.skewY
+        };
+      }
+
+      saveState();
+
+      for (let step = 0; step < n; step++) {
+        for (const clip of selState.clips) {
+          const fr = state.frames[clip.frameIdx];
+          if (!fr || !fr.layers[clip.layerIdx]) continue;
+          const targetBuf = fr.layers[clip.layerIdx].data;
+          const sampled = sampleClipToGrid(clip);
+          for (let i = 0; i < sampled.mask.length; i++) {
+            if (sampled.mask[i] && sampled.data[i * 4 + 3] > 0) {
+              const p = i * 4;
+              targetBuf[p] = sampled.data[p];
+              targetBuf[p + 1] = sampled.data[p + 1];
+              targetBuf[p + 2] = sampled.data[p + 2];
+              targetBuf[p + 3] = sampled.data[p + 3];
+            }
+          }
+        }
+
+        selState.tx += lastRepeatStep.tx;
+        selState.ty += lastRepeatStep.ty;
+        selState.angle += lastRepeatStep.angle;
+        selState.scaleX *= lastRepeatStep.scaleX;
+        selState.scaleY *= lastRepeatStep.scaleY;
+        selState.skewX += lastRepeatStep.skewX;
+        selState.skewY += lastRepeatStep.skewY;
+      }
+
+      updateStatus(0, 0, `↻ Repetido ${n}×! Ângulo: ${Math.round(selState.angle * 180 / Math.PI)}° | Escala: ${Math.round(selState.scaleX * 100)}%`);
       render();
       return true;
     }
@@ -437,14 +497,18 @@
     function getHandlesScreenPositions() {
       if (!selState.active || !selState.transformMode) return [];
       syncOverlayBounds();
-      const scaleXpx = overlay.width / state.gridW;
-      const scaleYpx = overlay.height / state.gridH;
+      const wRect = workspace.getBoundingClientRect();
+      const cRect = canvas.getBoundingClientRect();
+      const offX = cRect.left - wRect.left;
+      const offY = cRect.top - wRect.top;
+      const scaleXpx = cRect.width / state.gridW;
+      const scaleYpx = cRect.height / state.gridH;
       const hw = selState.baseW / 2;
       const hh = selState.baseH / 2;
 
       const toScreen = (lx, ly) => {
         const [gx, gy] = localToGrid(lx, ly);
-        return { x: gx * scaleXpx, y: gy * scaleYpx };
+        return { x: offX + gx * scaleXpx, y: offY + gy * scaleYpx };
       };
 
       const handles = [
@@ -576,9 +640,9 @@
 
     function hitTestHandle(clientX, clientY) {
       if (!selState.active || !selState.transformMode) return null;
-      const cRect = canvas.getBoundingClientRect();
-      const px = clientX - cRect.left;
-      const py = clientY - cRect.top;
+      const wRect = workspace.getBoundingClientRect();
+      const px = clientX - wRect.left;
+      const py = clientY - wRect.top;
       const handles = getHandlesScreenPositions();
       for (let i = handles.length - 1; i >= 0; i--) {
         const h = handles[i];
@@ -588,6 +652,7 @@
     }
 
     function beginHandleDrag(handleId, gx, gy) {
+      lastRepeatStep = null;
       activeHandle = handleId;
       const [pivGx, pivGy] = localToGrid(selState.pivotX, selState.pivotY);
       dragStart = {
@@ -678,6 +743,7 @@
       copyQuickSelection,
       pasteQuickSelection,
       cloneQuickSelection,
+      repeatTransform,
       getTransformedClipFor,
       getActiveFrameMask,
       drawOverlay,
@@ -694,6 +760,7 @@
         return mask[iy * state.gridW + ix] === 1;
       },
       translateBy: (dx, dy) => {
+        lastRepeatStep = null;
         selState.tx += dx;
         selState.ty += dy;
         render();
