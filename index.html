@@ -274,7 +274,7 @@
         <span class="text-zinc-400">Tamanho do Traço:</span>
         <span id="brushSizeVal" class="font-mono font-bold text-emerald-400">1px</span>
       </div>
-      <input type="range" id="brushSizeSlider" min="1" max="16" value="1" class="w-full accent-emerald-500 cursor-pointer">
+      <input type="range" id="brushSizeSlider" min="1" max="128" value="1" class="w-full accent-emerald-500 cursor-pointer">
     </div>
 
     <div class="flex flex-col gap-1.5 text-xs">
@@ -781,18 +781,69 @@
     }));
   }
 
-  function saveState() {
+  const MAX_HISTORY_BYTES = 128 * 1024 * 1024; // 128 MB de orçamento para Undo/Redo
+  const MAX_HISTORY_STEPS = 50;
+
+  function calcFullSnapshotBytes() {
+    let total = 0;
+    for (const fr of state.frames) {
+      for (const l of fr.layers) total += l.data.byteLength;
+    }
+    return total;
+  }
+
+  function trimHistoryStack(stack) {
+    let totalBytes = 0;
+    for (const item of stack) totalBytes += (item.bytes || 0);
+    while (stack.length > MAX_HISTORY_STEPS || (totalBytes > MAX_HISTORY_BYTES && stack.length > 5)) {
+      const removed = stack.shift();
+      totalBytes -= (removed.bytes || 0);
+    }
+  }
+
+  function saveState(mode = 'full') {
+    if (mode === 'layer') {
+      const fr = state.frames[state.activeFrameIdx];
+      const layer = fr && fr.layers[fr.activeLayerIdx];
+      if (layer) {
+        undoStack.push({
+          type: 'layer',
+          frameIdx: state.activeFrameIdx,
+          layerIdx: fr.activeLayerIdx,
+          data: new Uint8Array(layer.data),
+          bytes: layer.data.byteLength
+        });
+        trimHistoryStack(undoStack);
+        redoStack.length = 0;
+        updateHistoryUI();
+        return;
+      }
+    }
     undoStack.push({
+      type: 'full',
       gridW: state.gridW,
       gridH: state.gridH,
       activeFrameIdx: state.activeFrameIdx,
-      frames: cloneAllFrames()
+      frames: cloneAllFrames(),
+      bytes: calcFullSnapshotBytes()
     });
+    trimHistoryStack(undoStack);
     redoStack.length = 0;
     updateHistoryUI();
   }
 
   function restoreSnapshot(snap) {
+    if (snap.type === 'layer') {
+      const fr = state.frames[snap.frameIdx];
+      if (fr && fr.layers[snap.layerIdx]) {
+        state.activeFrameIdx = snap.frameIdx;
+        fr.activeLayerIdx = snap.layerIdx;
+        fr.layers[snap.layerIdx].data = snap.data;
+        render();
+        refreshAllUI();
+        return;
+      }
+    }
     state.gridW = snap.gridW;
     state.gridH = snap.gridH;
     state.frames = snap.frames;
@@ -804,26 +855,62 @@
   function undo() {
     if (undoStack.length === 0) return;
     commitSelection();
-    redoStack.push({
-      gridW: state.gridW,
-      gridH: state.gridH,
-      activeFrameIdx: state.activeFrameIdx,
-      frames: cloneAllFrames()
-    });
-    restoreSnapshot(undoStack.pop());
+    const snap = undoStack.pop();
+    if (snap.type === 'layer') {
+      const fr = state.frames[snap.frameIdx];
+      const layer = fr && fr.layers[snap.layerIdx];
+      if (layer) {
+        redoStack.push({
+          type: 'layer',
+          frameIdx: snap.frameIdx,
+          layerIdx: snap.layerIdx,
+          data: new Uint8Array(layer.data),
+          bytes: layer.data.byteLength
+        });
+      }
+    } else {
+      redoStack.push({
+        type: 'full',
+        gridW: state.gridW,
+        gridH: state.gridH,
+        activeFrameIdx: state.activeFrameIdx,
+        frames: cloneAllFrames(),
+        bytes: calcFullSnapshotBytes()
+      });
+    }
+    trimHistoryStack(redoStack);
+    restoreSnapshot(snap);
     updateHistoryUI();
   }
 
   function redo() {
     if (redoStack.length === 0) return;
     commitSelection();
-    undoStack.push({
-      gridW: state.gridW,
-      gridH: state.gridH,
-      activeFrameIdx: state.activeFrameIdx,
-      frames: cloneAllFrames()
-    });
-    restoreSnapshot(redoStack.pop());
+    const snap = redoStack.pop();
+    if (snap.type === 'layer') {
+      const fr = state.frames[snap.frameIdx];
+      const layer = fr && fr.layers[snap.layerIdx];
+      if (layer) {
+        undoStack.push({
+          type: 'layer',
+          frameIdx: snap.frameIdx,
+          layerIdx: snap.layerIdx,
+          data: new Uint8Array(layer.data),
+          bytes: layer.data.byteLength
+        });
+      }
+    } else {
+      undoStack.push({
+        type: 'full',
+        gridW: state.gridW,
+        gridH: state.gridH,
+        activeFrameIdx: state.activeFrameIdx,
+        frames: cloneAllFrames(),
+        bytes: calcFullSnapshotBytes()
+      });
+    }
+    trimHistoryStack(undoStack);
+    restoreSnapshot(snap);
     updateHistoryUI();
   }
 
@@ -1461,7 +1548,7 @@
 
     if (state.currentTool === 'bucket' || state.currentTool === 'magic') {
       const fillCol = state.currentTool === 'magic' ? [0, 0, 0, 0] : activeColor;
-      saveState();
+      saveState('layer');
       if (!floodFill(ux, uy, fillCol)) {
         undoStack.pop();
         updateHistoryUI();
@@ -1470,7 +1557,7 @@
       return;
     }
 
-    saveState();
+    saveState('layer');
     isDrawing = true;
     hasEnteredCanvas = inside;
     startX = ux; startY = uy;
@@ -2947,18 +3034,24 @@
   });
 
   // Zoom & Pan
+  const MAX_ZOOM = 64;
   function setZoom(newZoom) {
-    state.zoomLevel = Math.max(0.5, Math.min(8, newZoom));
-    if (state.zoomLevel === 1) { state.panX = 0; state.panY = 0; }
+    state.zoomLevel = Math.max(0.25, Math.min(MAX_ZOOM, newZoom));
+    if (Math.abs(state.zoomLevel - 1) < 0.02) {
+      state.zoomLevel = 1;
+      state.panX = 0;
+      state.panY = 0;
+    }
     applyTransform();
   }
-  document.getElementById('btnZoomIn').addEventListener('click', () => setZoom(state.zoomLevel + 0.5));
-  document.getElementById('btnZoomOut').addEventListener('click', () => setZoom(state.zoomLevel - 0.5));
+  document.getElementById('btnZoomIn').addEventListener('click', () => setZoom(state.zoomLevel * 1.25));
+  document.getElementById('btnZoomOut').addEventListener('click', () => setZoom(state.zoomLevel / 1.25));
   document.getElementById('btnZoomReset').addEventListener('click', () => { state.zoomLevel = 1; state.panX = 0; state.panY = 0; applyTransform(); });
 
   workspace.addEventListener('wheel', e => {
     e.preventDefault();
-    setZoom(state.zoomLevel + (e.deltaY < 0 ? 0.25 : -0.25));
+    const factor = e.deltaY < 0 ? 1.2 : (1 / 1.2);
+    setZoom(state.zoomLevel * factor);
   }, { passive: false });
 
   let initialPinchDist = null;
