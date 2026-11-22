@@ -353,11 +353,11 @@
       <div class="grid grid-cols-2 gap-2 text-xs">
         <label class="flex flex-col gap-1">
           <span class="text-zinc-400">Largura (px):</span>
-          <input type="number" id="impW" value="32" min="4" max="256" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
+          <input type="number" id="impW" value="32" min="4" max="2048" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
         </label>
         <label class="flex flex-col gap-1">
           <span class="text-zinc-400">Altura (px):</span>
-          <input type="number" id="impH" value="32" min="4" max="256" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
+          <input type="number" id="impH" value="32" min="4" max="2048" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
         </label>
       </div>
 
@@ -394,11 +394,11 @@
       <div class="grid grid-cols-2 gap-2 text-xs">
         <label class="flex flex-col gap-1">
           <span class="text-zinc-400">Nova Largura:</span>
-          <input type="number" id="resW" value="64" min="4" max="256" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
+          <input type="number" id="resW" value="64" min="4" max="2048" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
         </label>
         <label class="flex flex-col gap-1">
           <span class="text-zinc-400">Nova Altura:</span>
-          <input type="number" id="resH" value="64" min="4" max="256" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
+          <input type="number" id="resH" value="64" min="4" max="2048" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5">
         </label>
       </div>
 
@@ -559,10 +559,15 @@
   // =========================================================================
   // 1. FONTE ÚNICA DE VERDADE (ESTADO CENTRALIZADO DE QUADROS E CAMADAS)
   // =========================================================================
+  const MIN_GRID_SIZE = 4;
   const MAX_GRID_SIZE = 2048;
-  ['impW', 'impH', 'resW', 'resH'].forEach(id => {
+  const GRID_INPUT_IDS = ['impW', 'impH', 'resW', 'resH'];
+  GRID_INPUT_IDS.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.max = String(MAX_GRID_SIZE);
+    if (el) {
+      el.min = String(MIN_GRID_SIZE);
+      el.max = String(MAX_GRID_SIZE);
+    }
   });
 
   const state = {
@@ -670,17 +675,33 @@
     }
   `;
 
+  const TEX_UNIT_PREV = 0;
+  const TEX_UNIT_NEXT = 1;
+  const TEX_UNIT_SEL_MASK = 2;
+  const TEX_UNIT_LAYER_BASE = 3;
+  const MAX_HARDWARE_TEX_UNITS = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) || 8;
+  const MAX_GPU_LAYERS = Math.max(1, Math.min(12, MAX_HARDWARE_TEX_UNITS - TEX_UNIT_LAYER_BASE));
+
   const fsSource = `
     precision mediump float;
     varying vec2 v_uv;
-    uniform sampler2D u_tex;
     uniform sampler2D u_prevTex;
     uniform sampler2D u_nextTex;
     uniform sampler2D u_selMask;
+    uniform sampler2D u_layers[${MAX_GPU_LAYERS}];
+    uniform int u_layerCount;
     uniform float u_hasSelMask;
     uniform float u_onionSkin;
     uniform vec2 u_gridSize;
     uniform float u_showGrid;
+
+    vec4 blendOver(vec4 dst, vec4 src) {
+      if (src.a <= 0.001) return dst;
+      if (src.a >= 0.999 || dst.a <= 0.001) return src;
+      float outA = src.a + dst.a * (1.0 - src.a);
+      vec3 outRgb = (src.rgb * src.a + dst.rgb * dst.a * (1.0 - src.a)) / outA;
+      return vec4(outRgb, outA);
+    }
 
     void main() {
       vec2 pixelCoord = v_uv * u_gridSize;
@@ -703,8 +724,13 @@
         }
       }
 
-      vec4 texColor = texture2D(u_tex, v_uv);
-      finalColor = mix(finalColor, texColor.rgb, texColor.a);
+      // Composição paralela das camadas diretamente na GPU
+      vec4 composed = vec4(0.0);
+      for (int i = 0; i < ${MAX_GPU_LAYERS}; i++) {
+        if (i >= u_layerCount) break;
+        composed = blendOver(composed, texture2D(u_layers[i], v_uv));
+      }
+      finalColor = mix(finalColor, composed.rgb, composed.a);
 
       if (u_showGrid > 0.5) {
         vec2 gridPos = fract(pixelCoord);
@@ -766,10 +792,14 @@
   const uShowGridLoc = gl.getUniformLocation(prog, 'u_showGrid');
   const uHasSelMaskLoc = gl.getUniformLocation(prog, 'u_hasSelMask');
   const uOnionSkinLoc = gl.getUniformLocation(prog, 'u_onionSkin');
-  gl.uniform1i(gl.getUniformLocation(prog, 'u_tex'), 0);
-  gl.uniform1i(gl.getUniformLocation(prog, 'u_prevTex'), 1);
-  gl.uniform1i(gl.getUniformLocation(prog, 'u_nextTex'), 2);
-  gl.uniform1i(gl.getUniformLocation(prog, 'u_selMask'), 3);
+  const uLayerCountLoc = gl.getUniformLocation(prog, 'u_layerCount');
+
+  gl.uniform1i(gl.getUniformLocation(prog, 'u_prevTex'), TEX_UNIT_PREV);
+  gl.uniform1i(gl.getUniformLocation(prog, 'u_nextTex'), TEX_UNIT_NEXT);
+  gl.uniform1i(gl.getUniformLocation(prog, 'u_selMask'), TEX_UNIT_SEL_MASK);
+  for (let i = 0; i < MAX_GPU_LAYERS; i++) {
+    gl.uniform1i(gl.getUniformLocation(prog, `u_layers[${i}]`), TEX_UNIT_LAYER_BASE + i);
+  }
 
   function createPixelTex(unit) {
     gl.activeTexture(gl.TEXTURE0 + unit);
@@ -781,10 +811,46 @@
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     return t;
   }
-  const tex = createPixelTex(0);
-  const prevTex = createPixelTex(1);
-  const nextTex = createPixelTex(2);
-  const selMaskTex = createPixelTex(3);
+  const tex = createPixelTex(TEX_UNIT_LAYER_BASE);
+  const prevTex = createPixelTex(TEX_UNIT_PREV);
+  const nextTex = createPixelTex(TEX_UNIT_NEXT);
+  const selMaskTex = createPixelTex(TEX_UNIT_SEL_MASK);
+
+  // Cache de texturas WebGL por camada para upload incremental e zero recomposição na CPU
+  const _layerGpuCache = new WeakMap();
+  let _activeLayerTex = null;
+  let _activeLayerTexUnit = TEX_UNIT_LAYER_BASE;
+
+  function syncLayerTexture(layer, unit, overrideData = null) {
+    let entry = _layerGpuCache.get(layer);
+    if (!entry) {
+      entry = { tex: createPixelTex(unit), w: 0, h: 0, uploadedRef: null, dirty: true };
+      _layerGpuCache.set(layer, entry);
+    }
+    const bufToUpload = overrideData || layer.data;
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, entry.tex);
+    if (entry.w !== state.gridW || entry.h !== state.gridH || entry.uploadedRef !== bufToUpload || entry.dirty || overrideData !== null) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, bufToUpload);
+      entry.w = state.gridW;
+      entry.h = state.gridH;
+      entry.uploadedRef = overrideData ? null : bufToUpload;
+      entry.dirty = Boolean(overrideData);
+    }
+    return entry.tex;
+  }
+
+  let _gpuLayersDirty = false;
+  function invalidateAllLayersGpuCache() {
+    _gpuLayersDirty = true;
+    for (const fr of state.frames) {
+      for (const l of fr.layers) {
+        if (_layerGpuCache.has(l)) {
+          _layerGpuCache.get(l).dirty = true;
+        }
+      }
+    }
+  }
 
   // =========================================================================
   // 3. HISTÓRICO UNDO / REDO UNIFICADO
@@ -863,6 +929,9 @@
         state.activeFrameIdx = snap.frameIdx;
         fr.activeLayerIdx = snap.layerIdx;
         fr.layers[snap.layerIdx].data = snap.data;
+        if (_layerGpuCache.has(fr.layers[snap.layerIdx])) {
+          _layerGpuCache.get(fr.layers[snap.layerIdx]).dirty = true;
+        }
         render();
         refreshAllUI();
         return;
@@ -1087,9 +1156,18 @@
     }
   }
 
-  // Atualiza apenas o retângulo sujo (Dirty Rect) na GPU via texSubImage2D
+  // Atualiza apenas o retângulo sujo (Dirty Rect) diretamente na textura da camada ativa na GPU
   function flushDirtyRect(minX, minY, maxX, maxY) {
-    if (_texAllocatedW !== state.gridW || _texAllocatedH !== state.gridH || (typeof transformEngine !== 'undefined' && transformEngine.state.active)) {
+    const fr = state.frames[state.activeFrameIdx];
+    const activeLayer = fr && fr.layers[fr.activeLayerIdx];
+    if (
+      !activeLayer ||
+      !activeLayer.visible ||
+      !_activeLayerTex ||
+      _texAllocatedW !== state.gridW ||
+      _texAllocatedH !== state.gridH ||
+      (typeof transformEngine !== 'undefined' && transformEngine.state.active)
+    ) {
       render();
       return;
     }
@@ -1103,38 +1181,16 @@
       _reusableSubBuf = new Uint8Array(needed);
     }
     const sub = _reusableSubBuf.subarray(0, needed);
-    sub.fill(0);
-
-    const fr = state.frames[state.activeFrameIdx];
+    const src = activeLayer.data;
     const gw = state.gridW;
-    for (let i = 0; i < fr.layers.length; i++) {
-      if (!fr.layers[i].visible) continue;
-      const src = fr.layers[i].data;
-      for (let ry = 0; ry < rh; ry++) {
-        const gy = minY + ry;
-        let srcRow = (gy * gw + minX) * 4;
-        let dstRow = (ry * rw) * 4;
-        for (let rx = 0; rx < rw; rx++) {
-          const sp = srcRow + (rx << 2);
-          const srcA = src[sp + 3];
-          if (srcA === 0) continue;
-          const dp = dstRow + (rx << 2);
-          if (srcA === 255 || sub[dp + 3] === 0) {
-            sub[dp] = src[sp]; sub[dp + 1] = src[sp + 1];
-            sub[dp + 2] = src[sp + 2]; sub[dp + 3] = srcA;
-          } else {
-            const a = srcA / 255, dstA = sub[dp + 3] / 255, outA = a + dstA * (1 - a);
-            sub[dp]     = Math.round((src[sp] * a + sub[dp] * dstA * (1 - a)) / outA);
-            sub[dp + 1] = Math.round((src[sp + 1] * a + sub[dp + 1] * dstA * (1 - a)) / outA);
-            sub[dp + 2] = Math.round((src[sp + 2] * a + sub[dp + 2] * dstA * (1 - a)) / outA);
-            sub[dp + 3] = Math.round(outA * 255);
-          }
-        }
-      }
+
+    for (let ry = 0; ry < rh; ry++) {
+      const srcOffset = ((minY + ry) * gw + minX) * 4;
+      sub.set(src.subarray(srcOffset, srcOffset + rw * 4), ry * rw * 4);
     }
 
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.activeTexture(gl.TEXTURE0 + _activeLayerTexUnit);
+    gl.bindTexture(gl.TEXTURE_2D, _activeLayerTex);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, minX, minY, rw, rh, gl.RGBA, gl.UNSIGNED_BYTE, sub);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     scheduleFramesUIUpdate();
@@ -1151,8 +1207,8 @@
       const mask = _pendingSelPreviewMask;
       _pendingSelPreviewMask = null;
 
-      // Se a textura principal ainda não foi enviada, faz render completo uma vez
-      if (_texAllocatedW !== state.gridW || _texAllocatedH !== state.gridH) {
+      // Se a textura principal ainda não foi enviada ou houve alteração nas camadas, faz render completo uma vez
+      if (_texAllocatedW !== state.gridW || _texAllocatedH !== state.gridH || _gpuLayersDirty) {
         render(null, mask);
         return;
       }
@@ -1160,7 +1216,7 @@
       const maskInfo = buildFullGridMaskTexture(mask);
       gl.uniform1f(uHasSelMaskLoc, maskInfo.hasAny ? 1.0 : 0.0);
       if (maskInfo.hasAny) {
-        gl.activeTexture(gl.TEXTURE3);
+        gl.activeTexture(gl.TEXTURE0 + TEX_UNIT_SEL_MASK);
         gl.bindTexture(gl.TEXTURE_2D, selMaskTex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, maskInfo.buf);
       }
@@ -1172,7 +1228,6 @@
   }
 
   function render(overrideActiveLayerData = null, previewMask = null) {
-    const bufToDraw = getCompositeBuffer(overrideActiveLayerData, state.activeFrameIdx);
     gl.uniform2f(uGridSizeLoc, state.gridW, state.gridH);
     gl.uniform1f(uShowGridLoc, state.showGrid ? 1.0 : 0.0);
     const showOnion = (state.onionSkin && !state.isPlaying && state.frames.length > 1) ? 1.0 : 0.0;
@@ -1181,14 +1236,48 @@
     const maskInfo = buildFullGridMaskTexture(previewMask);
     gl.uniform1f(uHasSelMaskLoc, maskInfo.hasAny ? 1.0 : 0.0);
     if (maskInfo.hasAny) {
-      gl.activeTexture(gl.TEXTURE3);
+      gl.activeTexture(gl.TEXTURE0 + TEX_UNIT_SEL_MASK);
       gl.bindTexture(gl.TEXTURE_2D, selMaskTex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, maskInfo.buf);
     }
 
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, bufToDraw);
+    const fr = state.frames[state.activeFrameIdx];
+    const visibleLayers = [];
+    if (fr) {
+      for (let i = 0; i < fr.layers.length; i++) {
+        if (fr.layers[i].visible) {
+          visibleLayers.push({ layer: fr.layers[i], idx: i });
+        }
+      }
+    }
+
+    const hasActiveTransform = (typeof transformEngine !== 'undefined' && transformEngine.state.active);
+    const canComposeOnGpu = !hasActiveTransform && visibleLayers.length <= MAX_GPU_LAYERS;
+
+    if (canComposeOnGpu) {
+      _activeLayerTex = null;
+      for (let slot = 0; slot < visibleLayers.length; slot++) {
+        const item = visibleLayers[slot];
+        const unit = TEX_UNIT_LAYER_BASE + slot;
+        const isCurrentActive = (item.idx === fr.activeLayerIdx);
+        const layerTex = syncLayerTexture(item.layer, unit, isCurrentActive ? overrideActiveLayerData : null);
+        if (isCurrentActive) {
+          _activeLayerTex = layerTex;
+          _activeLayerTexUnit = unit;
+        }
+      }
+      gl.uniform1i(uLayerCountLoc, visibleLayers.length);
+      _gpuLayersDirty = false;
+    } else {
+      // Fallback CPU quando há transformação 2D ativa ou mais camadas que MAX_GPU_LAYERS
+      const bufToDraw = getCompositeBuffer(overrideActiveLayerData, state.activeFrameIdx);
+      gl.activeTexture(gl.TEXTURE0 + TEX_UNIT_LAYER_BASE);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, bufToDraw);
+      gl.uniform1i(uLayerCountLoc, 1);
+      _activeLayerTex = null;
+    }
+
     _texAllocatedW = state.gridW;
     _texAllocatedH = state.gridH;
 
@@ -1197,11 +1286,11 @@
       const prevBuf = state.activeFrameIdx > 0 ? getCompositeBuffer(null, state.activeFrameIdx - 1) : emptyBuf;
       const nextBuf = state.activeFrameIdx < state.frames.length - 1 ? getCompositeBuffer(null, state.activeFrameIdx + 1) : emptyBuf;
 
-      gl.activeTexture(gl.TEXTURE1);
+      gl.activeTexture(gl.TEXTURE0 + TEX_UNIT_PREV);
       gl.bindTexture(gl.TEXTURE_2D, prevTex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, prevBuf);
 
-      gl.activeTexture(gl.TEXTURE2);
+      gl.activeTexture(gl.TEXTURE0 + TEX_UNIT_NEXT);
       gl.bindTexture(gl.TEXTURE_2D, nextTex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, nextBuf);
     }
@@ -1525,6 +1614,7 @@
   function commitSelection() {
     if (!transformEngine.state.active) return;
     transformEngine.commit();
+    invalidateAllLayersGpuCache();
     setTransformMode(false);
     setSelectionMode('replace');
     updateSelectionBar();
@@ -1759,6 +1849,8 @@
       if (!floodFill(ux, uy, fillCol)) {
         undoStack.pop();
         updateHistoryUI();
+      } else {
+        invalidateAllLayersGpuCache();
       }
       render();
       return;
@@ -1973,12 +2065,15 @@
     const activeBuf = getActivePixels();
     if (state.currentTool === 'line') {
       drawLine(activeBuf, startX, startY, lastX, lastY, state.currentColor, state.brushSize);
+      invalidateAllLayersGpuCache();
       render();
     } else if (state.currentTool === 'rect') {
       drawRect(activeBuf, startX, startY, lastX, lastY, state.currentColor);
+      invalidateAllLayersGpuCache();
       render();
     } else if (state.currentTool === 'circle') {
       drawEllipse(activeBuf, startX, startY, lastX, lastY, state.currentColor, state.brushSize);
+      invalidateAllLayersGpuCache();
       render();
     }
     isDrawing = false;
