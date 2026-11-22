@@ -657,6 +657,10 @@
         window._pbTransformRaf = null;
         canvas.style.transform = `translate3d(${state.panX}px, ${state.panY}px, 0) scale(${state.zoomLevel})`;
         document.getElementById('zoomLabel').textContent = `${Math.round(state.zoomLevel * 100)}%`;
+        updateCellScreenPxUniform();
+        if (_texAllocatedW === state.gridW && _texAllocatedH === state.gridH) {
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
         if (typeof transformEngine !== 'undefined' && transformEngine.state.active && transformEngine.state.transformMode) {
           transformEngine.drawOverlay();
         }
@@ -679,6 +683,11 @@
   const TEX_UNIT_NEXT = 1;
   const TEX_UNIT_SEL_MASK = 2;
   const TEX_UNIT_LAYER_BASE = 3;
+  const SEL_BORDER_SCREEN_PX = 1.5;
+  const SEL_DASH_SCREEN_PX = 4.0;
+  const MIN_CELL_EDGE_FRAC = 0.02;
+  const MAX_CELL_EDGE_FRAC = 0.45;
+  const MIN_CELL_SCREEN_PX = 0.25;
   const MAX_HARDWARE_TEX_UNITS = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) || 8;
   const MAX_GPU_LAYERS = Math.max(1, Math.min(12, MAX_HARDWARE_TEX_UNITS - TEX_UNIT_LAYER_BASE));
 
@@ -694,6 +703,7 @@
     uniform float u_onionSkin;
     uniform vec2 u_gridSize;
     uniform float u_showGrid;
+    uniform float u_cellScreenPx;
 
     vec4 blendOver(vec4 dst, vec4 src) {
       if (src.a <= 0.001) return dst;
@@ -753,12 +763,13 @@
           float mDown  = cell.y < (u_gridSize.y - 1.0) ? texture2D(u_selMask, (cell + vec2(0.5, 1.5)) * texel).a : 0.0;
 
           vec2 f = fract(pixelCoord);
-          bool edge = (mLeft < 0.5 && f.x < 0.22) ||
-                      (mRight < 0.5 && f.x > 0.78) ||
-                      (mUp < 0.5 && f.y < 0.22) ||
-                      (mDown < 0.5 && f.y > 0.78);
+          float edgeW = clamp(1.50 / max(0.25, u_cellScreenPx), 0.02, 0.45);
+          bool edge = (mLeft < 0.5 && f.x < edgeW) ||
+                      (mRight < 0.5 && f.x > (1.0 - edgeW)) ||
+                      (mUp < 0.5 && f.y < edgeW) ||
+                      (mDown < 0.5 && f.y > (1.0 - edgeW));
           if (edge) {
-            float dash = mod(floor(pixelCoord.x * 4.0) + floor(pixelCoord.y * 4.0), 2.0);
+            float dash = mod(floor((gl_FragCoord.x + gl_FragCoord.y) / 4.00), 2.0);
             finalColor = mix(tintCol, vec3(1.0), dash);
           }
         }
@@ -793,6 +804,14 @@
   const uHasSelMaskLoc = gl.getUniformLocation(prog, 'u_hasSelMask');
   const uOnionSkinLoc = gl.getUniformLocation(prog, 'u_onionSkin');
   const uLayerCountLoc = gl.getUniformLocation(prog, 'u_layerCount');
+  const uCellScreenPxLoc = gl.getUniformLocation(prog, 'u_cellScreenPx');
+
+  function updateCellScreenPxUniform() {
+    if (!uCellScreenPxLoc || !state.gridW) return;
+    const cssW = parseFloat(canvas.style.width) || canvas.clientWidth || state.gridW;
+    const cellScreenPx = (cssW * state.zoomLevel) / state.gridW;
+    gl.uniform1f(uCellScreenPxLoc, cellScreenPx);
+  }
 
   gl.uniform1i(gl.getUniformLocation(prog, 'u_prevTex'), TEX_UNIT_PREV);
   gl.uniform1i(gl.getUniformLocation(prog, 'u_nextTex'), TEX_UNIT_NEXT);
@@ -1220,6 +1239,7 @@
         gl.bindTexture(gl.TEXTURE_2D, selMaskTex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.gridW, state.gridH, 0, gl.RGBA, gl.UNSIGNED_BYTE, maskInfo.buf);
       }
+      updateCellScreenPxUniform();
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       if (typeof transformEngine !== 'undefined' && transformEngine.state.active && transformEngine.state.transformMode) {
         transformEngine.drawOverlay();
@@ -1229,6 +1249,7 @@
 
   function render(overrideActiveLayerData = null, previewMask = null) {
     gl.uniform2f(uGridSizeLoc, state.gridW, state.gridH);
+    updateCellScreenPxUniform();
     gl.uniform1f(uShowGridLoc, state.showGrid ? 1.0 : 0.0);
     const showOnion = (state.onionSkin && !state.isPlaying && state.frames.length > 1) ? 1.0 : 0.0;
     gl.uniform1f(uOnionSkinLoc, showOnion);
@@ -1418,17 +1439,26 @@
     }
   }
 
-  function drawRect(buf, x0, y0, x1, y1, color) {
-    const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
-    const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
-    for (let x = minX; x <= maxX; x++) {
-      if (canDrawAt(x, minY)) setPixelRaw(buf, state.gridW, state.gridH, x, minY, color);
-      if (canDrawAt(x, maxY)) setPixelRaw(buf, state.gridW, state.gridH, x, maxY, color);
+  function drawRect(buf, x0, y0, x1, y1, color, size = state.brushSize) {
+    const halfBrush = Math.floor(Math.max(1, size) / 2);
+    let minX = Math.min(x0, x1) + halfBrush;
+    let maxX = Math.max(x0, x1) - halfBrush;
+    let minY = Math.min(y0, y1) + halfBrush;
+    let maxY = Math.max(y0, y1) - halfBrush;
+    if (minX > maxX) {
+      const midX = Math.round((x0 + x1) / 2);
+      minX = midX;
+      maxX = midX;
     }
-    for (let y = minY; y <= maxY; y++) {
-      if (canDrawAt(minX, y)) setPixelRaw(buf, state.gridW, state.gridH, minX, y, color);
-      if (canDrawAt(maxX, y)) setPixelRaw(buf, state.gridW, state.gridH, maxX, y, color);
+    if (minY > maxY) {
+      const midY = Math.round((y0 + y1) / 2);
+      minY = midY;
+      maxY = midY;
     }
+    drawLine(buf, minX, minY, maxX, minY, color, size);
+    drawLine(buf, maxX, minY, maxX, maxY, color, size);
+    drawLine(buf, maxX, maxY, minX, maxY, color, size);
+    drawLine(buf, minX, maxY, minX, minY, color, size);
   }
 
   let _shapePreviewBuf = null;
@@ -1448,24 +1478,35 @@
     return [x0 + Math.sign(dx || 1) * side, y0 + Math.sign(dy || 1) * side];
   }
 
+  const ELLIPSE_ADAPTIVE_STEP_RATIO = 0.22;
+  const MIN_ADAPTIVE_BRUSH_SIZE = 4;
+
   function drawEllipse(buf, x0, y0, x1, y1, color, size = state.brushSize) {
     const halfBrush = Math.floor(Math.max(1, size) / 2);
-    const minX = Math.min(x0, x1) + halfBrush;
-    const maxX = Math.max(x0, x1) - halfBrush;
-    const minY = Math.min(y0, y1) + halfBrush;
-    const maxY = Math.max(y0, y1) - halfBrush;
+    const rawMinX = Math.min(x0, x1);
+    const rawMaxX = Math.max(x0, x1);
+    const rawMinY = Math.min(y0, y1);
+    const rawMaxY = Math.max(y0, y1);
 
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const rx = Math.max(0, (maxX - minX) / 2);
-    const ry = Math.max(0, (maxY - minY) / 2);
+    const cx = (rawMinX + rawMaxX) / 2;
+    const cy = (rawMinY + rawMaxY) / 2;
+    const rx = Math.max(0, (rawMaxX - rawMinX) / 2 - halfBrush);
+    const ry = Math.max(0, (rawMaxY - rawMinY) / 2 - halfBrush);
 
     if (rx < 0.5 && ry < 0.5) {
       setPixel(buf, state.gridW, state.gridH, Math.round(cx), Math.round(cy), color, size);
       return;
     }
 
-    const plotSymmetric = (dx, dy) => {
+    const stepInterval = size >= MIN_ADAPTIVE_BRUSH_SIZE ? Math.max(1, Math.floor(size * ELLIPSE_ADAPTIVE_STEP_RATIO)) : 1;
+    let stepCounter = 0;
+
+    const plotSymmetric = (dx, dy, forcePlot = false) => {
+      if (!forcePlot && stepCounter !== 0) {
+        stepCounter = (stepCounter + 1) % stepInterval;
+        return;
+      }
+      stepCounter = (stepCounter + 1) % stepInterval;
       const xLeft = Math.round(cx - dx);
       const xRight = Math.round(cx + dx);
       const yTop = Math.round(cy - dy);
@@ -1488,7 +1529,7 @@
     // Região 1 (inclinação > -1)
     let p1 = ry2 - (rx2 * ry) + (0.25 * rx2);
     while (px < py) {
-      plotSymmetric(x, y);
+      plotSymmetric(x, y, x === 0);
       x++;
       px += 2 * ry2;
       if (p1 < 0) {
@@ -1503,7 +1544,7 @@
     // Região 2 (inclinação <= -1)
     let p2 = ry2 * (x + 0.5) * (x + 0.5) + rx2 * (y - 1) * (y - 1) - rx2 * ry2;
     while (y >= 0) {
-      plotSymmetric(x, y);
+      plotSymmetric(x, y, y <= 1);
       y--;
       py -= 2 * rx2;
       if (p2 > 0) {
