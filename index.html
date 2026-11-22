@@ -1449,29 +1449,70 @@
   }
 
   function drawEllipse(buf, x0, y0, x1, y1, color, size = state.brushSize) {
-    const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
-    const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+    const halfBrush = Math.floor(Math.max(1, size) / 2);
+    const minX = Math.min(x0, x1) + halfBrush;
+    const maxX = Math.max(x0, x1) - halfBrush;
+    const minY = Math.min(y0, y1) + halfBrush;
+    const maxY = Math.max(y0, y1) - halfBrush;
+
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
-    const rx = (maxX - minX) / 2;
-    const ry = (maxY - minY) / 2;
+    const rx = Math.max(0, (maxX - minX) / 2);
+    const ry = Math.max(0, (maxY - minY) / 2);
+
     if (rx < 0.5 && ry < 0.5) {
       setPixel(buf, state.gridW, state.gridH, Math.round(cx), Math.round(cy), color, size);
       return;
     }
-    const steps = Math.max(24, Math.ceil(2 * Math.PI * Math.max(rx, ry) * 1.5));
-    let prevX = null, prevY = null;
-    for (let i = 0; i <= steps; i++) {
-      const theta = (i / steps) * Math.PI * 2;
-      const px = Math.round(cx + Math.cos(theta) * rx);
-      const py = Math.round(cy + Math.sin(theta) * ry);
-      if (prevX !== null && (px !== prevX || py !== prevY)) {
-        drawLine(buf, prevX, prevY, px, py, color, size);
-      } else if (prevX === null) {
-        setPixel(buf, state.gridW, state.gridH, px, py, color, size);
+
+    const plotSymmetric = (dx, dy) => {
+      const xLeft = Math.round(cx - dx);
+      const xRight = Math.round(cx + dx);
+      const yTop = Math.round(cy - dy);
+      const yBottom = Math.round(cy + dy);
+      setPixel(buf, state.gridW, state.gridH, xRight, yBottom, color, size);
+      if (xLeft !== xRight) setPixel(buf, state.gridW, state.gridH, xLeft, yBottom, color, size);
+      if (yTop !== yBottom) {
+        setPixel(buf, state.gridW, state.gridH, xRight, yTop, color, size);
+        if (xLeft !== xRight) setPixel(buf, state.gridW, state.gridH, xLeft, yTop, color, size);
       }
-      prevX = px;
-      prevY = py;
+    };
+
+    const rx2 = rx * rx;
+    const ry2 = ry * ry;
+    let x = 0;
+    let y = ry;
+    let px = 0;
+    let py = 2 * rx2 * y;
+
+    // Região 1 (inclinação > -1)
+    let p1 = ry2 - (rx2 * ry) + (0.25 * rx2);
+    while (px < py) {
+      plotSymmetric(x, y);
+      x++;
+      px += 2 * ry2;
+      if (p1 < 0) {
+        p1 += ry2 + px;
+      } else {
+        y--;
+        py -= 2 * rx2;
+        p1 += ry2 + px - py;
+      }
+    }
+
+    // Região 2 (inclinação <= -1)
+    let p2 = ry2 * (x + 0.5) * (x + 0.5) + rx2 * (y - 1) * (y - 1) - rx2 * ry2;
+    while (y >= 0) {
+      plotSymmetric(x, y);
+      y--;
+      py -= 2 * rx2;
+      if (p2 > 0) {
+        p2 += rx2 - py;
+      } else {
+        x++;
+        px += 2 * ry2;
+        p2 += rx2 - py + px;
+      }
     }
   }
 
@@ -1808,7 +1849,7 @@
       if (transformEngine.state.mode === 'replace') commitSelection();
       selCreating = true;
       hasEnteredCanvas = inside;
-      startX = ux; startY = uy;
+      startX = ux; startY = uy; lastX = ux; lastY = uy;
       draftSelMask = new Uint8Array(state.gridW * state.gridH);
       lassoPoints = [];
 
@@ -1869,7 +1910,19 @@
     }
   }
 
+  let _shapePreviewRaf = null;
+  function scheduleShapePreviewRender(previewBuf) {
+    window._pendingShapePreviewBuf = previewBuf;
+    if (_shapePreviewRaf) return;
+    _shapePreviewRaf = requestAnimationFrame(() => {
+      _shapePreviewRaf = null;
+      if (!isDrawing || !window._pendingShapePreviewBuf) return;
+      render(window._pendingShapePreviewBuf);
+    });
+  }
+
   function handleMove(clientX, clientY, shiftKey = false) {
+    window._lastShiftKey = Boolean(shiftKey);
     const [ux, uy] = getCoords(clientX, clientY, false);
     const [x, y] = getCoords(clientX, clientY, true);
     const inside = isInsideGrid(ux, uy);
@@ -1973,17 +2026,17 @@
     } else if (state.currentTool === 'line') {
       const preview = getShapePreviewBuffer(strokeSnapshot);
       drawLine(preview, startX, startY, x, y, activeColor, state.brushSize);
-      render(preview);
+      scheduleShapePreviewRender(preview);
     } else if (state.currentTool === 'rect') {
       const preview = getShapePreviewBuffer(strokeSnapshot);
       const [ex, ey] = constrainSquareCoords(startX, startY, x, y, shiftKey);
       drawRect(preview, startX, startY, ex, ey, activeColor);
-      render(preview);
+      scheduleShapePreviewRender(preview);
     } else if (state.currentTool === 'circle') {
       const preview = getShapePreviewBuffer(strokeSnapshot);
       const [ex, ey] = constrainSquareCoords(startX, startY, x, y, shiftKey);
       drawEllipse(preview, startX, startY, ex, ey, activeColor, state.brushSize);
-      render(preview);
+      scheduleShapePreviewRender(preview);
     }
   }
 
@@ -2068,11 +2121,15 @@
       invalidateAllLayersGpuCache();
       render();
     } else if (state.currentTool === 'rect') {
-      drawRect(activeBuf, startX, startY, lastX, lastY, state.currentColor);
+      window._pendingShapePreviewBuf = null;
+      const [ex, ey] = constrainSquareCoords(startX, startY, lastX, lastY, Boolean(window._lastShiftKey));
+      drawRect(activeBuf, startX, startY, ex, ey, state.currentColor);
       invalidateAllLayersGpuCache();
       render();
     } else if (state.currentTool === 'circle') {
-      drawEllipse(activeBuf, startX, startY, lastX, lastY, state.currentColor, state.brushSize);
+      window._pendingShapePreviewBuf = null;
+      const [ex, ey] = constrainSquareCoords(startX, startY, lastX, lastY, Boolean(window._lastShiftKey));
+      drawEllipse(activeBuf, startX, startY, ex, ey, state.currentColor, state.brushSize);
       invalidateAllLayersGpuCache();
       render();
     }
