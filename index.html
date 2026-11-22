@@ -102,6 +102,7 @@
 
     <!-- Controle de Camadas, Animação, Arquivo e Fundo -->
     <div class="flex items-center gap-1.5 shrink-0 pr-2">
+      <button id="btnHeaderMaskGroups" class="px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-purple-300 active:scale-95" title="Grupos de Seleção & Máscaras (Ativo/Inativo)">🗂️</button>
       <button id="btnToggleLayers" class="px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-purple-400 active:scale-95" title="Camadas">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
       </button>
@@ -134,7 +135,10 @@
       <button id="btnRot90" class="hidden transform-quick-btn px-2 py-1 rounded bg-zinc-800 border border-zinc-600 text-zinc-200 font-semibold" title="Girar 90°">↻ 90°</button>
       <button id="btnResetTransform" class="hidden transform-quick-btn px-2 py-1 rounded bg-zinc-800 border border-zinc-600 text-amber-300 font-semibold" title="Resetar Transformação">Reset</button>
     </div>
-    <div class="flex items-center gap-1.5">
+    <div class="flex flex-wrap items-center gap-1">
+      <button id="btnSelCopy" class="px-2 py-1 rounded bg-zinc-800 border border-sky-500/50 text-sky-300 font-semibold" title="Copiar Seleção">Copiar</button>
+      <button id="btnSelPaste" class="px-2 py-1 rounded bg-zinc-800 border border-sky-500/50 text-sky-300 font-semibold" title="Colar Seleção">Colar</button>
+      <button id="btnSelClone" class="px-2 py-1 rounded bg-zinc-800 border border-purple-500/50 text-purple-300 font-semibold" title="Clonar Seleção no Lugar">Clonar</button>
       <button id="btnSelDelete" class="px-2 py-1 rounded bg-red-900/80 text-red-200 font-semibold">Apagar</button>
       <button id="btnSelCommit" class="px-2.5 py-1 rounded bg-emerald-500 text-zinc-950 font-bold">Fixar</button>
     </div>
@@ -415,29 +419,44 @@
     </div>
   </div>
 
-  <!-- MODAL 5: TABELA DE MÁSCARAS (BITMASK) & GRUPOS QUADRO × CAMADA -->
+  <!-- MODAL 5: MÚLTIPLOS GRUPOS NOMEADOS, MÁSCARAS BITMASK E ORIGEM -> DESTINO -->
   <div id="maskGroupsModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl p-4 w-full max-w-2xl max-h-[90dvh] flex flex-col gap-3 shadow-2xl overflow-hidden">
-      <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
-        <span class="font-bold text-sm text-purple-400">🗂️ Conjuntos (Quadro × Camada) & Máscaras Bitmask</span>
-        <button id="closeMaskGroupsModal" class="text-zinc-400 hover:text-white text-lg leading-none px-2">&times;</button>
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl p-4 w-full max-w-2xl max-h-[92dvh] flex flex-col gap-3 shadow-2xl overflow-hidden">
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 pb-2">
+        <span class="font-bold text-sm text-purple-400">🗂️ Grupos de Seleção & Máscaras Bitmask</span>
+        <div class="flex items-center gap-2">
+          <button type="button" id="btnToggleComplexMode" class="px-2.5 py-1 rounded-lg bg-zinc-800 border border-zinc-600 text-zinc-300 font-semibold text-xs">Modo Complexo: OFF</button>
+          <button id="closeMaskGroupsModal" class="text-zinc-400 hover:text-white text-lg leading-none px-2">&times;</button>
+        </div>
       </div>
 
-      <div class="overflow-y-auto flex flex-col gap-3 pr-1 text-xs">
-        <!-- Passo 1: Marcar quaisquer combinações de Quadro × Camada -->
+      <div id="complexModeBody" class="overflow-y-auto flex flex-col gap-3 pr-1 text-xs transition-opacity">
+        <!-- 1. Meus Grupos Nomeados -->
         <div class="flex flex-col gap-1.5">
+          <div class="flex flex-wrap items-center justify-between gap-1.5">
+            <span class="text-zinc-300 font-semibold">1. Meus Grupos (clique para editar ou ligar ATIVO/OFF):</span>
+            <div class="flex items-center gap-1">
+              <input type="text" id="newGroupNameInput" placeholder="Nome do grupo..." maxlength="18" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 w-32">
+              <button type="button" id="btnCreateNamedGroup" class="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white font-bold">+ Novo Grupo</button>
+            </div>
+          </div>
+          <div id="namedGroupsBar" class="flex items-center gap-1.5 overflow-x-auto pb-1"></div>
+        </div>
+
+        <!-- 2. Matriz Quadro x Camada do Grupo em Edição -->
+        <div class="flex flex-col gap-1.5 border-t border-zinc-800 pt-2">
           <div class="flex items-center justify-between">
-            <span class="text-zinc-300 font-semibold">1. Selecione os alvos (Quadro × Camada):</span>
-            <button type="button" id="btnClearTargetGroup" class="text-[11px] text-zinc-400 hover:text-white underline">Limpar Grupo</button>
+            <span class="text-zinc-300 font-semibold">2. Marque Quadros × Camadas do grupo selecionado:</span>
+            <button type="button" id="btnClearTargetGroup" class="text-[11px] text-zinc-400 hover:text-white underline">Desmarcar Todos</button>
           </div>
           <div id="heteroMatrixList" class="flex gap-2 overflow-x-auto pb-1"></div>
         </div>
 
-        <!-- Passo 2: Tabela do Grupo Ativo (permite vincular máscaras diferentes por alvo!) -->
+        <!-- 3. Tabela de Máscara Individual por Alvo -->
         <div class="flex flex-col gap-1.5 border-t border-zinc-800 pt-2">
           <div class="flex items-center justify-between">
-            <span class="text-zinc-300 font-semibold">2. Tabela do Grupo Ativo (Máscara por Alvo):</span>
-            <button type="button" id="btnApplyGroupSel" class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold">Ativar Seleção no Grupo</button>
+            <span class="text-zinc-300 font-semibold">3. Máscara por Quadro/Camada neste Grupo:</span>
+            <button type="button" id="btnApplyGroupSel" class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold">Ativar & Transformar Grupo</button>
           </div>
           <div class="border border-zinc-800 rounded-lg overflow-hidden">
             <table class="w-full text-left border-collapse">
@@ -454,16 +473,47 @@
           </div>
         </div>
 
-        <!-- Passo 3: Biblioteca de Máscaras Bitmask Salvas -->
+        <!-- 4. Copiar/Colar entre Grupos (Origem -> Destino) -->
+        <div class="flex flex-col gap-2 bg-zinc-950/70 border border-zinc-800 rounded-xl p-2.5">
+          <span class="text-zinc-300 font-semibold">4. Copiar e Colar entre Grupos (Origem → Destino):</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+            <label class="flex flex-col gap-0.5">
+              <span class="text-sky-400 font-semibold">Grupo de Origem:</span>
+              <select id="transferSourceGroupSelect" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-200"></select>
+            </label>
+            <label class="flex flex-col gap-0.5">
+              <span class="text-amber-400 font-semibold">Grupo de Destino:</span>
+              <select id="transferDestGroupSelect" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-200"></select>
+            </label>
+            <label class="flex flex-col gap-0.5">
+              <span class="text-zinc-400">Se tamanhos diferirem:</span>
+              <select id="pasteCountModeSelect" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-200">
+                <option value="loop">Loop (Repetir ciclo: A, B, A, B...)</option>
+                <option value="hold">Hold (Estender último: A, B, B, B...)</option>
+                <option value="truncate">1-para-1 (Truncar excedentes)</option>
+              </select>
+            </label>
+            <label class="flex flex-col gap-0.5">
+              <span class="text-zinc-400">Máscara de destino:</span>
+              <select id="pasteMaskModeSelect" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-200">
+                <option value="clip">Recortar pela máscara de destino</option>
+                <option value="free">Colar livre (ignorar recorte)</option>
+              </select>
+            </label>
+          </div>
+          <button type="button" id="btnTransferGroups" class="w-full py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs">Copiar Origem → Colar no Destino</button>
+        </div>
+
+        <!-- 5. Biblioteca de Máscaras Bitmask Salvas -->
         <div class="flex flex-col gap-1.5 border-t border-zinc-800 pt-2">
           <div class="flex flex-wrap items-center justify-between gap-1.5">
-            <span class="text-zinc-300 font-semibold">3. Biblioteca de Máscaras Salvas (Bitmask):</span>
+            <span class="text-zinc-300 font-semibold">5. Biblioteca de Máscaras Salvas (Bitmask):</span>
             <div class="flex items-center gap-1">
               <input type="text" id="newMaskNameInput" placeholder="Nome da máscara..." maxlength="20" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 w-36">
               <button type="button" id="btnSaveBitmask" class="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white font-bold">+ Salvar Atual</button>
             </div>
           </div>
-          <div class="border border-zinc-800 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+          <div class="border border-zinc-800 rounded-lg overflow-hidden max-h-36 overflow-y-auto">
             <table class="w-full text-left border-collapse">
               <thead class="bg-zinc-950 text-zinc-400 text-[11px]">
                 <tr>
@@ -474,13 +524,6 @@
               </thead>
               <tbody id="savedMasksTableBody" class="bg-zinc-900/60 divide-y divide-zinc-800"></tbody>
             </table>
-          </div>
-          <div class="flex items-center justify-end gap-2 pt-1">
-            <button type="button" id="btnExportMasksJson" class="px-2.5 py-1 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-semibold">Exportar JSON</button>
-            <label class="px-2.5 py-1 rounded bg-zinc-800 border border-zinc-700 text-sky-400 font-semibold cursor-pointer">
-              Importar JSON
-              <input type="file" id="importMasksJsonInput" accept=".json,application/json" class="hidden">
-            </label>
           </div>
         </div>
       </div>
@@ -824,7 +867,9 @@
   function buildFullGridMaskTexture(previewMask = null) {
     const maskTexBuf = new Uint8Array(state.gridW * state.gridH * 4);
     let hasAny = false;
-    const activeMask = (typeof transformEngine !== 'undefined') ? transformEngine.getActiveFrameMask() : null;
+    const activeMask = (typeof transformEngine !== 'undefined' && transformEngine.state.active)
+      ? transformEngine.getActiveFrameMask()
+      : ((typeof maskGroupManager !== 'undefined') ? maskGroupManager.getCurrentActiveMaskBytes() : null);
     if (activeMask) {
       for (let i = 0; i < activeMask.length; i++) {
         if (activeMask[i]) {
@@ -893,9 +938,21 @@
     buf[idx] = rgba[0]; buf[idx+1] = rgba[1]; buf[idx+2] = rgba[2]; buf[idx+3] = rgba[3];
   }
 
-  function setPixel(buf, w, h, x, y, rgba, size = 1) {
+  function canDrawAt(x, y) {
+    if (typeof maskGroupManager !== 'undefined' && maskGroupManager.isGroupActive()) {
+      return maskGroupManager.canEditCurrentPixel(x, y);
+    }
+    return true;
+  }
+
+  function setPixel(buf, w, h, x, y, rgba, size = 1, respectMask = true) {
+    const plot = (px, py) => {
+      if (respectMask && !canDrawAt(px, py)) return;
+      setPixelRaw(buf, w, h, px, py, rgba);
+    };
+
     if (size <= 1 && (state.brushShape !== 'custom' || !state.activeCustomMatrix)) {
-      setPixelRaw(buf, w, h, x, y, rgba);
+      plot(x, y);
       return;
     }
 
@@ -908,7 +965,7 @@
           if (!state.activeCustomMatrix[gy * 7 + gx]) continue;
           for (let sy = 0; sy < scale; sy++) {
             for (let sx = 0; sx < scale; sx++) {
-              setPixelRaw(buf, w, h, x + (gx * scale + sx) - offset, y + (gy * scale + sy) - offset, rgba);
+              plot(x + (gx * scale + sx) - offset, y + (gy * scale + sy) - offset);
             }
           }
         }
@@ -935,7 +992,7 @@
           inside = (Math.abs(rx) <= arm || Math.abs(ry) <= arm);
         }
 
-        if (inside) setPixelRaw(buf, w, h, x + dx - offset, y + dy - offset, rgba);
+        if (inside) plot(x + dx - offset, y + dy - offset);
       }
     }
   }
@@ -962,6 +1019,7 @@
       const vIdx = cy * state.gridW + cx;
       if (visited[vIdx]) continue;
       visited[vIdx] = 1;
+      if (!canDrawAt(cx, cy)) continue;
       if (colorsMatch(getPixel(targetBuf, state.gridW, cx, cy), targetColor)) {
         setPixelRaw(targetBuf, state.gridW, state.gridH, cx, cy, fillColor);
         stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
@@ -987,12 +1045,12 @@
     const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
     const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
     for (let x = minX; x <= maxX; x++) {
-      setPixelRaw(buf, state.gridW, state.gridH, x, minY, color);
-      setPixelRaw(buf, state.gridW, state.gridH, x, maxY, color);
+      if (canDrawAt(x, minY)) setPixelRaw(buf, state.gridW, state.gridH, x, minY, color);
+      if (canDrawAt(x, maxY)) setPixelRaw(buf, state.gridW, state.gridH, x, maxY, color);
     }
     for (let y = minY; y <= maxY; y++) {
-      setPixelRaw(buf, state.gridW, state.gridH, minX, y, color);
-      setPixelRaw(buf, state.gridW, state.gridH, maxX, y, color);
+      if (canDrawAt(minX, y)) setPixelRaw(buf, state.gridW, state.gridH, minX, y, color);
+      if (canDrawAt(maxX, y)) setPixelRaw(buf, state.gridW, state.gridH, maxX, y, color);
     }
   }
 
@@ -1021,12 +1079,22 @@
   });
 
   const maskGroupsModal = document.getElementById('maskGroupsModal');
-  document.getElementById('btnOpenMaskGroups').addEventListener('click', () => {
+  function openMaskGroupsModal() {
+    maskGroupManager.captureScreenMaskAsFallback();
     maskGroupManager.renderGroupUI();
     maskGroupsModal.classList.remove('hidden');
-  });
+  }
+  document.getElementById('btnOpenMaskGroups').addEventListener('click', openMaskGroupsModal);
+  document.getElementById('btnHeaderMaskGroups').addEventListener('click', openMaskGroupsModal);
   document.getElementById('closeMaskGroupsModal').addEventListener('click', () => maskGroupsModal.classList.add('hidden'));
-  document.getElementById('btnClearTargetGroup').addEventListener('click', () => maskGroupManager.clearGroup());
+  document.getElementById('btnToggleComplexMode').addEventListener('click', () => maskGroupManager.toggleComplexMode());
+
+  document.getElementById('btnCreateNamedGroup').addEventListener('click', () => {
+    const inp = document.getElementById('newGroupNameInput');
+    maskGroupManager.createNewGroup(inp.value);
+    inp.value = '';
+  });
+  document.getElementById('btnClearTargetGroup').addEventListener('click', () => maskGroupManager.clearEditingGroup());
   document.getElementById('btnSaveBitmask').addEventListener('click', () => {
     const inp = document.getElementById('newMaskNameInput');
     maskGroupManager.saveCurrentMaskToLibrary(inp.value);
@@ -1036,11 +1104,16 @@
     maskGroupManager.applyGroupSelection();
     maskGroupsModal.classList.add('hidden');
   });
-  document.getElementById('btnExportMasksJson').addEventListener('click', () => maskGroupManager.exportJSON());
-  document.getElementById('importMasksJsonInput').addEventListener('change', e => {
-    if (e.target.files[0]) maskGroupManager.importJSON(e.target.files[0]);
-    e.target.value = '';
-  });
+  document.getElementById('transferSourceGroupSelect').addEventListener('change', e => maskGroupManager.setSourceGroupId(e.target.value));
+  document.getElementById('transferDestGroupSelect').addEventListener('change', e => maskGroupManager.setDestGroupId(e.target.value));
+  document.getElementById('pasteCountModeSelect').addEventListener('change', e => maskGroupManager.setPasteCountMode(e.target.value));
+  document.getElementById('pasteMaskModeSelect').addEventListener('change', e => maskGroupManager.setPasteMaskMode(e.target.value));
+  document.getElementById('btnTransferGroups').addEventListener('click', () => maskGroupManager.transferGroupToGroup());
+
+  // Botões rápidos Copiar / Colar / Clonar na barra de seleção
+  document.getElementById('btnSelCopy').addEventListener('click', () => transformEngine.copyQuickSelection());
+  document.getElementById('btnSelPaste').addEventListener('click', () => { transformEngine.pasteQuickSelection(0, 0); updateSelectionBar(); });
+  document.getElementById('btnSelClone').addEventListener('click', () => transformEngine.cloneQuickSelection());
 
   function isSelectionTool(t) {
     return t === 'select' || t === 'lasso' || t === 'selbrush';
@@ -1112,7 +1185,7 @@
 
   function stampBrushOnMask(maskArr, cx, cy) {
     const tempRGBA = new Uint8Array(state.gridW * state.gridH * 4);
-    setPixel(tempRGBA, state.gridW, state.gridH, cx, cy, [255, 255, 255, 255], state.brushSize);
+    setPixel(tempRGBA, state.gridW, state.gridH, cx, cy, [255, 255, 255, 255], state.brushSize, false);
     for (let i = 0; i < maskArr.length; i++) {
       if (tempRGBA[i * 4 + 3] > 0) maskArr[i] = 1;
     }
@@ -2801,7 +2874,16 @@
   document.getElementById('btnClear').addEventListener('click', () => {
     commitSelection();
     saveState();
-    getActivePixels().fill(0);
+    const buf = getActivePixels();
+    if (typeof maskGroupManager !== 'undefined' && maskGroupManager.isGroupActive()) {
+      for (let y = 0; y < state.gridH; y++) {
+        for (let x = 0; x < state.gridW; x++) {
+          if (canDrawAt(x, y)) setPixelRaw(buf, state.gridW, state.gridH, x, y, [0, 0, 0, 0]);
+        }
+      }
+    } else {
+      buf.fill(0);
+    }
     render();
   });
 

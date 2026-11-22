@@ -1,5 +1,5 @@
 // =========================================================================
-// MOTOR ABSTRATO DE SELEÇÃO MULTI-QUADRO / MULTI-CAMADA E TRANSFORMAÇÃO 2D
+// MOTOR ABSTRATO DE SELEÇÃO, FULCRO MÓVEL E TRANSFORMAÇÃO 2D
 // =========================================================================
 (function () {
   window.createSelectionTransformEngine = function (deps) {
@@ -10,29 +10,31 @@
       saveState, render, updateStatus, setPixelRaw, getPixel
     } = deps;
 
-    // Estado interno do grupo de seleção e transformação
     const selState = {
       active: false,
       mode: 'replace',       // 'replace' | 'add' | 'sub'
-      transformMode: false,  // false = mover simples | true = exibir alças (ampliar/girar/shear)
+      transformMode: false,
       baseX: 0,
       baseY: 0,
       baseW: 0,
       baseH: 0,
+      // Fulcro / Pivô em coordenadas locais relativas ao centro (baseW/2, baseH/2)
+      pivotX: 0,
+      pivotY: 0,
       // Parâmetros de transformação
       tx: 0,
       ty: 0,
       scaleX: 1,
       scaleY: 1,
-      angle: 0,    // radianos
-      skewX: 0,    // tangente/fator horizontal
-      skewY: 0,    // tangente/fator vertical
-      // Lista de recortes extraídos por [frameIdx, layerIdx]:
-      // { frameIdx, layerIdx, data: Uint8Array(baseW*baseH*4), mask: Uint8Array(baseW*baseH) }
+      angle: 0,
+      skewX: 0,
+      skewY: 0,
       clips: []
     };
 
-    // Canvas overlay transparente sobre o canvas WebGL para desenhar as alças de transformação com nitidez
+    // Área de transferência rápida da barra de seleção
+    let quickClipboard = null; // { baseW, baseH, data: Uint8Array, mask: Uint8Array }
+
     const overlay = document.createElement('canvas');
     overlay.id = 'transformOverlay';
     overlay.style.position = 'absolute';
@@ -52,20 +54,20 @@
       overlay.style.height = cRect.height + 'px';
     }
 
-    // Mapeia ponto do espaço local da seleção (relativo ao centro) para coordenadas do grid
+    // Mapeia ponto local (relativo ao centro do clip) -> coordenada do grid usando o Fulcro (pivotX, pivotY)
     function localToGrid(lx, ly) {
-      const cx = selState.baseX + selState.baseW / 2 + selState.tx;
-      const cy = selState.baseY + selState.baseH / 2 + selState.ty;
+      const cx = selState.baseX + selState.baseW / 2 + selState.tx + selState.pivotX;
+      const cy = selState.baseY + selState.baseH / 2 + selState.ty + selState.pivotY;
 
-      // 1. Escala (suporta negativa -> espelhamento)
-      let x = lx * selState.scaleX;
-      let y = ly * selState.scaleY;
+      // Relativo ao fulcro
+      let x = (lx - selState.pivotX) * selState.scaleX;
+      let y = (ly - selState.pivotY) * selState.scaleY;
 
-      // 2. Shear (cisalhamento)
+      // Shear
       const sx = x + y * selState.skewX;
       const sy = y + x * selState.skewY;
 
-      // 3. Rotação
+      // Rotação
       const cos = Math.cos(selState.angle);
       const sin = Math.sin(selState.angle);
       const rx = sx * cos - sy * sin;
@@ -74,33 +76,40 @@
       return [cx + rx, cy + ry];
     }
 
-    // Mapeia coordenada do grid para o espaço local original (inversa exata para Nearest-Neighbor)
+    // Inversa exata: coordenada do grid -> ponto local original
     function gridToLocal(gx, gy) {
-      const cx = selState.baseX + selState.baseW / 2 + selState.tx;
-      const cy = selState.baseY + selState.baseH / 2 + selState.ty;
+      const cx = selState.baseX + selState.baseW / 2 + selState.tx + selState.pivotX;
+      const cy = selState.baseY + selState.baseH / 2 + selState.ty + selState.pivotY;
       const dx = gx - cx;
       const dy = gy - cy;
 
-      // Inversa da Rotação
       const cos = Math.cos(-selState.angle);
       const sin = Math.sin(-selState.angle);
       const rx = dx * cos - dy * sin;
       const ry = dx * sin + dy * cos;
 
-      // Inversa do Shear: [1, skewX; skewY, 1]
       const det = 1 - selState.skewX * selState.skewY;
       const safeDet = Math.abs(det) < 1e-4 ? (det < 0 ? -1e-4 : 1e-4) : det;
       const ux = (rx - ry * selState.skewX) / safeDet;
       const uy = (ry - rx * selState.skewY) / safeDet;
 
-      // Inversa da Escala
       const sX = Math.abs(selState.scaleX) < 1e-3 ? (selState.scaleX < 0 ? -1e-3 : 1e-3) : selState.scaleX;
       const sY = Math.abs(selState.scaleY) < 1e-3 ? (selState.scaleY < 0 ? -1e-3 : 1e-3) : selState.scaleY;
 
-      return [ux / sX, uy / sY];
+      return [ux / sX + selState.pivotX, uy / sY + selState.pivotY];
     }
 
-    // Amostra um clip transformado na grade (gridW x gridH)
+    // Move o fulcro para uma posição do grid mantendo os pixels visualmente parados no mesmo lugar
+    function movePivotToGrid(gx, gy) {
+      const [newPivotX, newPivotY] = gridToLocal(gx, gy);
+      const [oldOriginGx, oldOriginGy] = localToGrid(0, 0);
+      selState.pivotX = newPivotX;
+      selState.pivotY = newPivotY;
+      const [newOriginGx, newOriginGy] = localToGrid(0, 0);
+      selState.tx += (oldOriginGx - newOriginGx);
+      selState.ty += (oldOriginGy - newOriginGy);
+    }
+
     function sampleClipToGrid(clip) {
       const outData = new Uint8Array(state.gridW * state.gridH * 4);
       const outMask = new Uint8Array(state.gridW * state.gridH);
@@ -130,7 +139,6 @@
       return { data: outData, mask: outMask };
     }
 
-    // Obtém a lista alvo de pares { frameIdx, layerIdx } marcada pelo usuário
     function getTargetTargets() {
       const framesIdx = getSelectedFrames();
       const layersIdx = getSelectedLayers();
@@ -139,8 +147,6 @@
       for (const fIdx of framesIdx) {
         const fr = state.frames[fIdx];
         if (!fr) continue;
-        // Se apenas 1 quadro está selecionado, usa todas as camadas marcadas nele;
-        // se múltiplos quadros estão selecionados, aplica nas mesmas camadas equivalentes (ou na camada ativa de cada quadro)
         if (framesIdx.length === 1) {
           for (const lIdx of layersIdx) {
             if (fr.layers[lIdx]) targets.push({ frameIdx: fIdx, layerIdx: lIdx });
@@ -161,7 +167,6 @@
       return targets;
     }
 
-    // Fixa (grava) todos os clips transformados de volta nos respectivos quadros e camadas
     function commit() {
       if (!selState.active) return;
       for (const clip of selState.clips) {
@@ -186,6 +191,7 @@
     function clear() {
       selState.active = false;
       selState.clips = [];
+      selState.pivotX = 0; selState.pivotY = 0;
       selState.tx = 0; selState.ty = 0;
       selState.scaleX = 1; selState.scaleY = 1;
       selState.angle = 0;
@@ -194,15 +200,12 @@
       drawOverlay();
     }
 
-    // Aplica uma nova máscara booleana (replace, add, sub) em todos os Quadros/Camadas selecionados
     function applyMask(newMask) {
-      // Reconstrói máscara global atual antes da modificação
       const prevFullMask = new Uint8Array(state.gridW * state.gridH);
       if (selState.active && selState.clips.length > 0) {
         const refSample = sampleClipToGrid(selState.clips[0]);
         prevFullMask.set(refSample.mask);
 
-        // Restaura temporariamente os pixels já extraídos para recalcular a união/subtração sem perda
         for (const clip of selState.clips) {
           const fr = state.frames[clip.frameIdx];
           if (!fr || !fr.layers[clip.layerIdx]) continue;
@@ -276,22 +279,19 @@
       }
 
       selState.active = true;
-      selState.baseX = minX;
-      selState.baseY = minY;
-      selState.baseW = w;
-      selState.baseH = h;
+      selState.baseX = minX; selState.baseY = minY;
+      selState.baseW = w; selState.baseH = h;
+      selState.pivotX = 0; selState.pivotY = 0;
       selState.tx = 0; selState.ty = 0;
       selState.scaleX = 1; selState.scaleY = 1;
       selState.angle = 0;
       selState.skewX = 0; selState.skewY = 0;
       selState.clips = newClips;
-      state.selection = selState; // Mantém compatibilidade de checagem booleana
+      state.selection = selState;
 
       render();
     }
 
-    // Usado pelo pipeline de composição WebGL para renderizar o preview do quadro/camada atual
-    // Aplica uma lista heterogênea: [{ frameIdx, layerIdx, maskBytes }, ...]
     function applyHeterogeneousTargets(targetSpecs) {
       commit();
       let minX = state.gridW, minY = state.gridH, maxX = -1, maxY = -1;
@@ -308,7 +308,6 @@
           }
         }
       }
-
       if (maxX < minX || maxY < minY) return;
 
       const w = maxX - minX + 1;
@@ -341,16 +340,82 @@
       }
 
       selState.active = true;
-      selState.baseX = minX;
-      selState.baseY = minY;
-      selState.baseW = w;
-      selState.baseH = h;
+      selState.baseX = minX; selState.baseY = minY;
+      selState.baseW = w; selState.baseH = h;
+      selState.pivotX = 0; selState.pivotY = 0;
       selState.tx = 0; selState.ty = 0;
       selState.scaleX = 1; selState.scaleY = 1;
       selState.angle = 0;
       selState.skewX = 0; selState.skewY = 0;
       selState.clips = newClips;
       state.selection = selState;
+    }
+
+    // Copiar / Colar / Clonar rápido da seleção atual
+    function copyQuickSelection() {
+      if (!selState.active || selState.clips.length === 0) return false;
+      const fr = getActiveFrame();
+      const clip = selState.clips.find(c => c.frameIdx === state.activeFrameIdx && c.layerIdx === fr.activeLayerIdx) || selState.clips[0];
+      quickClipboard = {
+        baseX: selState.baseX, baseY: selState.baseY,
+        baseW: selState.baseW, baseH: selState.baseH,
+        data: new Uint8Array(clip.data),
+        mask: new Uint8Array(clip.mask)
+      };
+      updateStatus(0, 0, '📋 Seleção copiada!');
+      return true;
+    }
+
+    function pasteQuickSelection(offsetX = 0, offsetY = 0) {
+      if (!quickClipboard) return false;
+      commit();
+      saveState();
+      const fr = getActiveFrame();
+      selState.active = true;
+      selState.baseX = quickClipboard.baseX;
+      selState.baseY = quickClipboard.baseY;
+      selState.baseW = quickClipboard.baseW;
+      selState.baseH = quickClipboard.baseH;
+      selState.pivotX = 0; selState.pivotY = 0;
+      selState.tx = offsetX; selState.ty = offsetY;
+      selState.scaleX = 1; selState.scaleY = 1;
+      selState.angle = 0;
+      selState.skewX = 0; selState.skewY = 0;
+      selState.clips = [{
+        frameIdx: state.activeFrameIdx,
+        layerIdx: fr.activeLayerIdx,
+        data: new Uint8Array(quickClipboard.data),
+        mask: new Uint8Array(quickClipboard.mask)
+      }];
+      state.selection = selState;
+      render();
+      return true;
+    }
+
+    function cloneQuickSelection() {
+      if (!selState.active) return false;
+      // Grava a cópia original nos pixels e mantém a cópia flutuante deslocada 1px para arrastar
+      saveState();
+      for (const clip of selState.clips) {
+        const fr = state.frames[clip.frameIdx];
+        if (!fr || !fr.layers[clip.layerIdx]) continue;
+        const targetBuf = fr.layers[clip.layerIdx].data;
+        const sampled = sampleClipToGrid(clip);
+        for (let i = 0; i < sampled.mask.length; i++) {
+          if (sampled.mask[i] && sampled.data[i * 4 + 3] > 0) {
+            const p = i * 4;
+            targetBuf[p] = sampled.data[p];
+            targetBuf[p + 1] = sampled.data[p + 1];
+            targetBuf[p + 2] = sampled.data[p + 2];
+            targetBuf[p + 3] = sampled.data[p + 3];
+          }
+        }
+      }
+      selState.tx += 2;
+      selState.ty += 2;
+      updateStatus(0, 0, '⧉ Seleção clonada! Arraste para posicionar.');
+      render();
+      return true;
     }
 
     function getTransformedClipFor(frameIdx, layerIdx) {
@@ -367,7 +432,7 @@
     }
 
     // =====================================================================
-    // ALÇAS INTERATIVAS DE TRANSFORMAÇÃO (ESCALA/ESPELHAR, ROTAÇÃO, SHEAR)
+    // ALÇAS DE TRANSFORMAÇÃO + ALÇA DO FULCRO (PIVOT)
     // =====================================================================
     function getHandlesScreenPositions() {
       if (!selState.active || !selState.transformMode) return [];
@@ -383,24 +448,21 @@
       };
 
       const handles = [
-        // 4 Cantos (Proporcional + Espelhar)
         { id: 'nw', lx: -hw, ly: -hh, color: '#04d361', shape: 'rect' },
         { id: 'ne', lx:  hw, ly: -hh, color: '#04d361', shape: 'rect' },
         { id: 'se', lx:  hw, ly:  hh, color: '#04d361', shape: 'rect' },
         { id: 'sw', lx: -hw, ly:  hh, color: '#04d361', shape: 'rect' },
-        // 4 Meios-lados (Horizontal / Vertical + Espelhar)
         { id: 'n',  lx:   0, ly: -hh, color: '#38bdf8', shape: 'rect' },
         { id: 's',  lx:   0, ly:  hh, color: '#38bdf8', shape: 'rect' },
         { id: 'w',  lx: -hw, ly:   0, color: '#38bdf8', shape: 'rect' },
         { id: 'e',  lx:  hw, ly:   0, color: '#38bdf8', shape: 'rect' },
-        // Alça de Shear (Inclinação horizontal no topo interno e vertical na lateral)
         { id: 'shearX', lx: 0, ly: -hh * 0.55, color: '#f59e0b', shape: 'diamond' },
         { id: 'shearY', lx: hw * 0.55, ly: 0,  color: '#f59e0b', shape: 'diamond' }
       ];
 
       const mapped = handles.map(h => ({ ...h, ...toScreen(h.lx, h.ly) }));
 
-      // Alça de Rotação projetada acima da borda superior
+      // Alça de Rotação
       const topCenter = toScreen(0, -hh);
       const center = toScreen(0, 0);
       let vx = topCenter.x - center.x;
@@ -415,6 +477,16 @@
         anchorY: topCenter.y,
         color: '#f43f5e',
         shape: 'circle'
+      });
+
+      // Alça do Fulcro (Pivô) por último (prioridade de clique!)
+      const piv = toScreen(selState.pivotX, selState.pivotY);
+      mapped.push({
+        id: 'pivot',
+        x: piv.x,
+        y: piv.y,
+        color: '#fde047',
+        shape: 'pivot'
       });
 
       return mapped;
@@ -432,7 +504,6 @@
       const sw = handles.find(h => h.id === 'sw');
       const rot = handles.find(h => h.id === 'rotate');
 
-      // Caixa delimitadora transformada
       octx.save();
       octx.strokeStyle = '#04d361';
       octx.lineWidth = 1.5;
@@ -445,7 +516,6 @@
       octx.closePath();
       octx.stroke();
 
-      // Haste da alça de rotação
       if (rot) {
         octx.setLineDash([]);
         octx.strokeStyle = '#f43f5e';
@@ -455,18 +525,33 @@
         octx.stroke();
       }
 
-      // Desenha cada alça
       octx.setLineDash([]);
       for (const h of handles) {
-        octx.fillStyle = h.color;
-        octx.strokeStyle = '#121214';
-        octx.lineWidth = 2;
-        if (h.shape === 'circle') {
+        if (h.shape === 'pivot') {
+          // Desenha mira do Fulcro (⊕)
+          octx.beginPath();
+          octx.arc(h.x, h.y, 7, 0, Math.PI * 2);
+          octx.fillStyle = 'rgba(253, 224, 71, 0.25)';
+          octx.fill();
+          octx.lineWidth = 2;
+          octx.strokeStyle = '#fde047';
+          octx.stroke();
+          octx.beginPath();
+          octx.moveTo(h.x - 10, h.y); octx.lineTo(h.x + 10, h.y);
+          octx.moveTo(h.x, h.y - 10); octx.lineTo(h.x, h.y + 10);
+          octx.stroke();
+        } else if (h.shape === 'circle') {
+          octx.fillStyle = h.color;
+          octx.strokeStyle = '#121214';
+          octx.lineWidth = 2;
           octx.beginPath();
           octx.arc(h.x, h.y, 7, 0, Math.PI * 2);
           octx.fill();
           octx.stroke();
         } else if (h.shape === 'diamond') {
+          octx.fillStyle = h.color;
+          octx.strokeStyle = '#121214';
+          octx.lineWidth = 2;
           octx.beginPath();
           octx.moveTo(h.x, h.y - 6);
           octx.lineTo(h.x + 6, h.y);
@@ -476,6 +561,9 @@
           octx.fill();
           octx.stroke();
         } else {
+          octx.fillStyle = h.color;
+          octx.strokeStyle = '#121214';
+          octx.lineWidth = 2;
           octx.fillRect(h.x - 5.5, h.y - 5.5, 11, 11);
           octx.strokeRect(h.x - 5.5, h.y - 5.5, 11, 11);
         }
@@ -483,7 +571,6 @@
       octx.restore();
     }
 
-    // Interação de ponteiro nas alças
     let activeHandle = null;
     let dragStart = null;
 
@@ -493,7 +580,6 @@
       const px = clientX - cRect.left;
       const py = clientY - cRect.top;
       const handles = getHandlesScreenPositions();
-      // Prioriza rotação e shear, depois cantos e lados
       for (let i = handles.length - 1; i >= 0; i--) {
         const h = handles[i];
         if (Math.hypot(px - h.x, py - h.y) <= 16) return h.id;
@@ -503,59 +589,66 @@
 
     function beginHandleDrag(handleId, gx, gy) {
       activeHandle = handleId;
-      const cx = selState.baseX + selState.baseW / 2 + selState.tx;
-      const cy = selState.baseY + selState.baseH / 2 + selState.ty;
+      const [pivGx, pivGy] = localToGrid(selState.pivotX, selState.pivotY);
       dragStart = {
-        gx, gy,
+        gx, gy, pivGx, pivGy,
         tx: selState.tx, ty: selState.ty,
         scaleX: selState.scaleX, scaleY: selState.scaleY,
         angle: selState.angle,
         skewX: selState.skewX, skewY: selState.skewY,
-        startAngle: Math.atan2(gy - cy, gx - cx)
+        startAngle: Math.atan2(gy - pivGy, gx - pivGx)
       };
     }
 
     function updateHandleDrag(gx, gy, shiftKey = false) {
       if (!activeHandle || !dragStart) return;
-      const cx = selState.baseX + selState.baseW / 2 + dragStart.tx;
-      const cy = selState.baseY + selState.baseH / 2 + dragStart.ty;
+
+      if (activeHandle === 'pivot') {
+        movePivotToGrid(gx, gy);
+        updateStatus(Math.round(gx), Math.round(gy), `⊕ Fulcro movido para (${Math.round(gx)}, ${Math.round(gy)})`);
+        render();
+        return;
+      }
+
+      const pivGx = dragStart.pivGx;
+      const pivGy = dragStart.pivGy;
       const hw = Math.max(0.5, selState.baseW / 2);
       const hh = Math.max(0.5, selState.baseH / 2);
 
-      // Vetor do centro até o cursor rotacionado de volta para os eixos locais
-      const dx = gx - cx;
-      const dy = gy - cy;
+      const dx = gx - pivGx;
+      const dy = gy - pivGy;
       const cos = Math.cos(-dragStart.angle);
       const sin = Math.sin(-dragStart.angle);
       const lx = dx * cos - dy * sin;
       const ly = dx * sin + dy * cos;
 
       if (activeHandle === 'rotate') {
-        const curAng = Math.atan2(gy - cy, gx - cx);
+        const curAng = Math.atan2(gy - pivGy, gx - pivGx);
         let newAng = dragStart.angle + (curAng - dragStart.startAngle);
         if (shiftKey) {
-          const step = Math.PI / 12; // 15 graus
+          const step = Math.PI / 12;
           newAng = Math.round(newAng / step) * step;
         }
         selState.angle = newAng;
       } else if (activeHandle === 'shearX') {
-        const deltaLx = lx - (dragStart.gx - cx) * cos + (dragStart.gy - cy) * sin;
+        const deltaLx = lx - ((dragStart.gx - pivGx) * cos - (dragStart.gy - pivGy) * sin);
         selState.skewX = Math.max(-2.5, Math.min(2.5, dragStart.skewX + deltaLx / Math.max(1, hh * Math.abs(dragStart.scaleY))));
       } else if (activeHandle === 'shearY') {
-        const deltaLy = ly - (dragStart.gx - cx) * sin - (dragStart.gy - cy) * cos;
+        const deltaLy = ly - ((dragStart.gx - pivGx) * sin + (dragStart.gy - pivGy) * cos);
         selState.skewY = Math.max(-2.5, Math.min(2.5, dragStart.skewY + deltaLy / Math.max(1, hw * Math.abs(dragStart.scaleX))));
       } else {
-        // Alças de Escala (com espelhamento automático ao cruzar o eixo oposto!)
         const signX = activeHandle.includes('w') ? -1 : (activeHandle.includes('e') ? 1 : 0);
         const signY = activeHandle.includes('n') ? -1 : (activeHandle.includes('s') ? 1 : 0);
+
+        const refDistX = Math.max(0.5, Math.abs((signX * hw) - selState.pivotX));
+        const refDistY = Math.max(0.5, Math.abs((signY * hh) - selState.pivotY));
 
         let newScaleX = dragStart.scaleX;
         let newScaleY = dragStart.scaleY;
 
-        if (signX !== 0) newScaleX = (lx * signX) / hw;
-        if (signY !== 0) newScaleY = (ly * signY) / hh;
+        if (signX !== 0) newScaleX = (lx * signX) / refDistX;
+        if (signY !== 0) newScaleY = (ly * signY) / refDistY;
 
-        // Cantos mantêm proporção (preservando o sinal de espelhamento de cada eixo)
         if (signX !== 0 && signY !== 0) {
           const mag = Math.max(Math.abs(newScaleX), Math.abs(newScaleY));
           newScaleX = (newScaleX < 0 ? -1 : 1) * mag;
@@ -582,6 +675,9 @@
       clear,
       applyMask,
       applyHeterogeneousTargets,
+      copyQuickSelection,
+      pasteQuickSelection,
+      cloneQuickSelection,
       getTransformedClipFor,
       getActiveFrameMask,
       drawOverlay,
@@ -603,6 +699,7 @@
         render();
       },
       resetTransform: () => {
+        selState.pivotX = 0; selState.pivotY = 0;
         selState.tx = 0; selState.ty = 0;
         selState.scaleX = 1; selState.scaleY = 1;
         selState.angle = 0;
