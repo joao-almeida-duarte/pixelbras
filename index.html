@@ -86,8 +86,16 @@
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
       </button>
 
+      <button id="tool-circle" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Círculo / Elipse (C)">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+      </button>
+
       <button id="tool-select" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Seleção Retangular / Mover (M)">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"><rect x="3" y="3" width="18" height="18" rx="1"/></svg>
+      </button>
+
+      <button id="tool-selcircle" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Seleção Circular / Elíptica">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"><circle cx="12" cy="12" r="9"/></svg>
       </button>
 
       <button id="tool-lasso" class="tool-btn flex items-center gap-1 px-2.5 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold shrink-0" title="Seleção por Laço Livre (O)">
@@ -1334,6 +1342,73 @@
     }
   }
 
+  let _shapePreviewBuf = null;
+  function getShapePreviewBuffer(snapshot) {
+    if (!_shapePreviewBuf || _shapePreviewBuf.length !== snapshot.length) {
+      _shapePreviewBuf = new Uint8Array(snapshot.length);
+    }
+    _shapePreviewBuf.set(snapshot);
+    return _shapePreviewBuf;
+  }
+
+  function constrainSquareCoords(x0, y0, x1, y1, shiftKey) {
+    if (!shiftKey) return [x1, y1];
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const side = Math.max(Math.abs(dx), Math.abs(dy));
+    return [x0 + Math.sign(dx || 1) * side, y0 + Math.sign(dy || 1) * side];
+  }
+
+  function drawEllipse(buf, x0, y0, x1, y1, color, size = state.brushSize) {
+    const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+    const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const rx = (maxX - minX) / 2;
+    const ry = (maxY - minY) / 2;
+    if (rx < 0.5 && ry < 0.5) {
+      setPixel(buf, state.gridW, state.gridH, Math.round(cx), Math.round(cy), color, size);
+      return;
+    }
+    const steps = Math.max(24, Math.ceil(2 * Math.PI * Math.max(rx, ry) * 1.5));
+    let prevX = null, prevY = null;
+    for (let i = 0; i <= steps; i++) {
+      const theta = (i / steps) * Math.PI * 2;
+      const px = Math.round(cx + Math.cos(theta) * rx);
+      const py = Math.round(cy + Math.sin(theta) * ry);
+      if (prevX !== null && (px !== prevX || py !== prevY)) {
+        drawLine(buf, prevX, prevY, px, py, color, size);
+      } else if (prevX === null) {
+        setPixel(buf, state.gridW, state.gridH, px, py, color, size);
+      }
+      prevX = px;
+      prevY = py;
+    }
+  }
+
+  function fillEllipseMask(maskArr, x0, y0, x1, y1) {
+    const minX = Math.max(0, Math.min(x0, x1));
+    const maxX = Math.min(state.gridW - 1, Math.max(x0, x1));
+    const minY = Math.max(0, Math.min(y0, y1));
+    const maxY = Math.min(state.gridH - 1, Math.max(y0, y1));
+    const cx = (Math.min(x0, x1) + Math.max(x0, x1)) / 2;
+    const cy = (Math.min(y0, y1) + Math.max(y0, y1)) / 2;
+    const rx = Math.max(0.5, (Math.max(x0, x1) - Math.min(x0, x1)) / 2 + 0.5);
+    const ry = Math.max(0.5, (Math.max(y0, y1) - Math.min(y0, y1)) / 2 + 0.5);
+    const gw = state.gridW;
+    for (let py = minY; py <= maxY; py++) {
+      const ny = (py - cy) / ry;
+      const ny2 = ny * ny;
+      if (ny2 > 1) continue;
+      for (let px = minX; px <= maxX; px++) {
+        const nx = (px - cx) / rx;
+        if (nx * nx + ny2 <= 1) {
+          maskArr[py * gw + px] = 1;
+        }
+      }
+    }
+  }
+
   // =========================================================================
   // 6. SELEÇÃO & TRANSFORMAÇÃO MULTI-QUADRO / MULTI-CAMADA
   // =========================================================================
@@ -1400,7 +1475,7 @@
   });
 
   function isSelectionTool(t) {
-    return t === 'select' || t === 'lasso' || t === 'selbrush';
+    return t === 'select' || t === 'selcircle' || t === 'lasso' || t === 'selbrush';
   }
 
   function setSelectionMode(mode) {
@@ -1468,10 +1543,54 @@
   }
 
   function stampBrushOnMask(maskArr, cx, cy) {
-    const tempRGBA = new Uint8Array(state.gridW * state.gridH * 4);
-    setPixel(tempRGBA, state.gridW, state.gridH, cx, cy, [255, 255, 255, 255], state.brushSize, false);
-    for (let i = 0; i < maskArr.length; i++) {
-      if (tempRGBA[i * 4 + 3] > 0) maskArr[i] = 1;
+    const gw = state.gridW, gh = state.gridH;
+    const size = state.brushSize;
+    const plotMask = (px, py) => {
+      if (px >= 0 && px < gw && py >= 0 && py < gh) {
+        maskArr[py * gw + px] = 1;
+      }
+    };
+
+    if (size <= 1 && (state.brushShape !== 'custom' || !state.activeCustomMatrix)) {
+      plotMask(cx, cy);
+      return;
+    }
+
+    if (state.brushShape === 'custom' && state.activeCustomMatrix && size > 1) {
+      const scale = Math.max(1, Math.round(size / 3));
+      const total = 7 * scale;
+      const offset = Math.floor(total / 2);
+      for (let gy = 0; gy < 7; gy++) {
+        for (let gx = 0; gx < 7; gx++) {
+          if (!state.activeCustomMatrix[gy * 7 + gx]) continue;
+          for (let sy = 0; sy < scale; sy++) {
+            for (let sx = 0; sx < scale; sx++) {
+              plotMask(cx + (gx * scale + sx) - offset, cy + (gy * scale + sy) - offset);
+            }
+          }
+        }
+      }
+      return;
+    }
+
+    const offset = Math.floor(size / 2);
+    const center = (size - 1) / 2;
+    const radius = size / 2;
+    for (let dy = 0; dy < size; dy++) {
+      for (let dx = 0; dx < size; dx++) {
+        const rx = dx - center;
+        const ry = dy - center;
+        let inside = true;
+        if (state.brushShape === 'circle') {
+          inside = (rx * rx + ry * ry) <= (radius * radius);
+        } else if (state.brushShape === 'diamond') {
+          inside = (Math.abs(rx) + Math.abs(ry)) <= radius;
+        } else if (state.brushShape === 'cross') {
+          const arm = Math.max(1, Math.floor(size / 3));
+          inside = (Math.abs(rx) <= arm / 2) || (Math.abs(ry) <= arm / 2);
+        }
+        if (inside) plotMask(cx + dx - offset, cy + dy - offset);
+      }
     }
   }
 
@@ -1479,9 +1598,16 @@
     let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
     let err = dx + dy;
+    const size = state.brushSize;
+    const stepInterval = size >= 4 ? Math.max(1, Math.floor(size * 0.22)) : 1;
+    let stepCount = 0;
     while (true) {
-      stampBrushOnMask(maskArr, x0, y0);
-      if (x0 === x1 && y0 === y1) break;
+      const isEnd = (x0 === x1 && y0 === y1);
+      if (stepCount === 0 || isEnd) {
+        stampBrushOnMask(maskArr, x0, y0);
+      }
+      if (isEnd) break;
+      stepCount = (stepCount + 1) % stepInterval;
       let e2 = 2 * err;
       if (e2 >= dy) { err += dy; x0 += sx; }
       if (e2 <= dx) { err += dx; y0 += sy; }
@@ -1500,7 +1626,7 @@
   // =========================================================================
   // 7. INTERAÇÃO MOUSE & TOUCH (COM PROTEÇÃO DE 2 DEDOS)
   // =========================================================================
-  const tools = ['brush', 'bucket', 'picker', 'line', 'rect', 'select', 'lasso', 'selbrush', 'eraser', 'magic'];
+  const tools = ['brush', 'bucket', 'picker', 'line', 'rect', 'circle', 'select', 'selcircle', 'lasso', 'selbrush', 'eraser', 'magic'];
   const brushPanel = document.getElementById('brushPanel');
 
   function selectTool(name) {
@@ -1610,7 +1736,7 @@
       return;
     }
 
-    if (!inside && (state.currentTool === 'picker' || state.currentTool === 'bucket' || state.currentTool === 'magic' || state.currentTool === 'line' || state.currentTool === 'rect')) {
+    if (!inside && (state.currentTool === 'picker' || state.currentTool === 'bucket' || state.currentTool === 'magic' || state.currentTool === 'line' || state.currentTool === 'rect' || state.currentTool === 'circle')) {
       return;
     }
 
@@ -1643,7 +1769,7 @@
     hasEnteredCanvas = inside;
     startX = ux; startY = uy;
     const activeBuf = getActivePixels();
-    strokeSnapshot = (state.currentTool === 'line' || state.currentTool === 'rect') ? new Uint8Array(activeBuf) : null;
+    strokeSnapshot = (state.currentTool === 'line' || state.currentTool === 'rect' || state.currentTool === 'circle') ? new Uint8Array(activeBuf) : null;
 
     if (inside && (state.currentTool === 'brush' || state.currentTool === 'eraser')) {
       setPixel(activeBuf, state.gridW, state.gridH, ux, uy, activeColor, state.brushSize);
@@ -1713,12 +1839,18 @@
           }
           startX = ux; startY = uy;
           renderSelectionPreview(draftSelMask);
+        } else if (state.currentTool === 'selcircle') {
+          draftSelMask.fill(0);
+          const [ex, ey] = constrainSquareCoords(startX, startY, ux, uy, shiftKey);
+          fillEllipseMask(draftSelMask, startX, startY, ex, ey);
+          renderSelectionPreview(draftSelMask);
         } else {
           draftSelMask.fill(0);
-          const minX = Math.max(0, Math.min(startX, ux));
-          const maxX = Math.min(state.gridW - 1, Math.max(startX, ux));
-          const minY = Math.max(0, Math.min(startY, uy));
-          const maxY = Math.min(state.gridH - 1, Math.max(startY, uy));
+          const [ex, ey] = constrainSquareCoords(startX, startY, ux, uy, shiftKey);
+          const minX = Math.max(0, Math.min(startX, ex));
+          const maxX = Math.min(state.gridW - 1, Math.max(startX, ex));
+          const minY = Math.max(0, Math.min(startY, ey));
+          const maxY = Math.min(state.gridH - 1, Math.max(startY, ey));
           for (let py = minY; py <= maxY; py++) {
             for (let px = minX; px <= maxX; px++) {
               draftSelMask[py * state.gridW + px] = 1;
@@ -1747,12 +1879,18 @@
       startX = ux; startY = uy;
       renderDirtyRect(prevX, prevY, ux, uy, Math.max(4, state.brushSize * 2));
     } else if (state.currentTool === 'line') {
-      const preview = new Uint8Array(strokeSnapshot);
+      const preview = getShapePreviewBuffer(strokeSnapshot);
       drawLine(preview, startX, startY, x, y, activeColor, state.brushSize);
       render(preview);
     } else if (state.currentTool === 'rect') {
-      const preview = new Uint8Array(strokeSnapshot);
-      drawRect(preview, startX, startY, x, y, activeColor);
+      const preview = getShapePreviewBuffer(strokeSnapshot);
+      const [ex, ey] = constrainSquareCoords(startX, startY, x, y, shiftKey);
+      drawRect(preview, startX, startY, ex, ey, activeColor);
+      render(preview);
+    } else if (state.currentTool === 'circle') {
+      const preview = getShapePreviewBuffer(strokeSnapshot);
+      const [ex, ey] = constrainSquareCoords(startX, startY, x, y, shiftKey);
+      drawEllipse(preview, startX, startY, ex, ey, activeColor, state.brushSize);
       render(preview);
     }
   }
@@ -1783,10 +1921,41 @@
             if (e2 >= dy) { err += dy; cx += sx; }
             if (e2 <= dx) { err += dx; cy += sy; }
           }
-          for (let gy = 0; gy < state.gridH; gy++) {
-            for (let gx = 0; gx < state.gridW; gx++) {
-              if (!draftSelMask[gy * state.gridW + gx] && pointInPolygon(gx, gy, lassoPoints)) {
-                draftSelMask[gy * state.gridW + gx] = 1;
+          // Scanline Polygon Fill restrito ao bounding box do laço (instantâneo mesmo em 2048x2048)
+          let minX = state.gridW, maxX = 0, minY = state.gridH, maxY = 0;
+          for (let i = 0; i < lassoPoints.length; i++) {
+            const px = lassoPoints[i][0], py = lassoPoints[i][1];
+            if (px < minX) minX = px;
+            if (px > maxX) maxX = px;
+            if (py < minY) minY = py;
+            if (py > maxY) maxY = py;
+          }
+          minX = Math.max(0, minX); maxX = Math.min(state.gridW - 1, maxX);
+          minY = Math.max(0, minY); maxY = Math.min(state.gridH - 1, maxY);
+
+          const n = lassoPoints.length;
+          const nodes = [];
+          const gw = state.gridW;
+          for (let gy = minY; gy <= maxY; gy++) {
+            nodes.length = 0;
+            const scanY = gy + 0.5;
+            let j = n - 1;
+            for (let i = 0; i < n; i++) {
+              const yi = lassoPoints[i][1] + 0.5;
+              const yj = lassoPoints[j][1] + 0.5;
+              if ((yi < scanY && yj >= scanY) || (yj < scanY && yi >= scanY)) {
+                const xi = lassoPoints[i][0] + 0.5;
+                const xj = lassoPoints[j][0] + 0.5;
+                nodes.push(xi + ((scanY - yi) / (yj - yi)) * (xj - xi));
+              }
+              j = i;
+            }
+            nodes.sort((a, b) => a - b);
+            for (let k = 0; k < nodes.length - 1; k += 2) {
+              const startFill = Math.max(minX, Math.ceil(nodes[k] - 0.5));
+              const endFill = Math.min(maxX, Math.floor(nodes[k + 1] - 0.5));
+              for (let gx = startFill; gx <= endFill; gx++) {
+                draftSelMask[gy * gw + gx] = 1;
               }
             }
           }
@@ -1807,6 +1976,9 @@
       render();
     } else if (state.currentTool === 'rect') {
       drawRect(activeBuf, startX, startY, lastX, lastY, state.currentColor);
+      render();
+    } else if (state.currentTool === 'circle') {
+      drawEllipse(activeBuf, startX, startY, lastX, lastY, state.currentColor, state.brushSize);
       render();
     }
     isDrawing = false;
