@@ -44,14 +44,20 @@
     workspace.appendChild(overlay);
     const octx = overlay.getContext('2d');
 
+    let lastOverlayW = 0, lastOverlayH = 0, overlayIsDirty = false;
     function syncOverlayBounds() {
-      const wRect = workspace.getBoundingClientRect();
-      overlay.style.left = '0px';
-      overlay.style.top = '0px';
-      overlay.width = Math.max(1, Math.round(wRect.width));
-      overlay.height = Math.max(1, Math.round(wRect.height));
-      overlay.style.width = wRect.width + 'px';
-      overlay.style.height = wRect.height + 'px';
+      const w = Math.max(1, Math.round(workspace.clientWidth));
+      const h = Math.max(1, Math.round(workspace.clientHeight));
+      if (w !== lastOverlayW || h !== lastOverlayH) {
+        lastOverlayW = w;
+        lastOverlayH = h;
+        overlay.style.left = '0px';
+        overlay.style.top = '0px';
+        overlay.width = w;
+        overlay.height = h;
+        overlay.style.width = w + 'px';
+        overlay.style.height = h + 'px';
+      }
     }
 
     // Mapeia ponto local (relativo ao centro do clip) -> coordenada do grid usando o Fulcro (pivotX, pivotY)
@@ -557,9 +563,16 @@
     }
 
     function drawOverlay() {
+      if (!selState.active || !selState.transformMode) {
+        if (overlayIsDirty) {
+          octx.clearRect(0, 0, overlay.width, overlay.height);
+          overlayIsDirty = false;
+        }
+        return;
+      }
       syncOverlayBounds();
       octx.clearRect(0, 0, overlay.width, overlay.height);
-      if (!selState.active || !selState.transformMode) return;
+      overlayIsDirty = true;
 
       const handles = getHandlesScreenPositions();
       const nw = handles.find(h => h.id === 'nw');

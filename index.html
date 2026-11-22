@@ -50,6 +50,7 @@
     .overflow-x-auto::-webkit-scrollbar-thumb:hover { background: #52525b; }
     .overflow-x-auto { scrollbar-width: thin; scrollbar-color: #3f3f46 #18181b; }
   }
+  #canvas { will-change: transform; }
 </style>
 </head>
 <body class="flex flex-col justify-between text-zinc-200 font-sans">
@@ -616,9 +617,16 @@
   }
 
   function applyTransform() {
-    canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`;
-    document.getElementById('zoomLabel').textContent = `${Math.round(state.zoomLevel * 100)}%`;
-    if (typeof transformEngine !== 'undefined') transformEngine.drawOverlay();
+    if (!window._pbTransformRaf) {
+      window._pbTransformRaf = requestAnimationFrame(() => {
+        window._pbTransformRaf = null;
+        canvas.style.transform = `translate3d(${state.panX}px, ${state.panY}px, 0) scale(${state.zoomLevel})`;
+        document.getElementById('zoomLabel').textContent = `${Math.round(state.zoomLevel * 100)}%`;
+        if (typeof transformEngine !== 'undefined' && transformEngine.state.active && transformEngine.state.transformMode) {
+          transformEngine.drawOverlay();
+        }
+      });
+    }
   }
   window.addEventListener('resize', fitCanvas);
 
